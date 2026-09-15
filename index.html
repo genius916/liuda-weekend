@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1">
+  <meta name="theme-color" content="#10b981">
+  <meta name="description" content="溜达 · 周末城市探索指南，智能推荐、组队出发、打卡记录、攻略分享。周末不宅，去溜达。">
+  <title>溜达 · 周末城市探索指南</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%2310b981'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif'>溜</text></svg>">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app" id="app">
+
+    <!-- ============ 首页：智能推荐 ============ -->
+    <section class="page active" id="page-home">
+      <header class="topbar">
+        <div class="brand">
+          <span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="5" r="2.2"/><path d="M6 19V8a2 2 0 0 1 2-2h8"/></svg></span>
+          溜达
+        </div>
+        <div class="action">
+          <button id="btn-weather" aria-label="切换天气"></button>
+          <button id="btn-notice" aria-label="通知">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.5S4 15.5 4 9.8A4.6 4.6 0 0 1 12 6a4.6 4.6 0 0 1 8 3.8c0 5.7-8 10.7-8 10.7Z"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- 天气 + 预算 概览 -->
+      <div class="hero" id="home-hero"></div>
+
+      <!-- 兴趣分类筛选 -->
+      <div class="cat-scroll" id="home-cats"></div>
+
+      <!-- 推荐列表 -->
+      <div class="section-head">
+        <h2 id="home-reco-title">为你推荐</h2>
+        <span class="more" id="home-reco-sub"></span>
+      </div>
+      <div class="list" id="home-list"></div>
+    </section>
+
+    <!-- ============ 组队 ============ -->
+    <section class="page" id="page-team">
+      <header class="topbar">
+        <div class="brand"><span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="17" cy="9" r="2.6"/><path d="M15.5 15.2c2.3.2 4 1.7 4.5 4.3"/></svg></span>组队出发</div>
+        <div class="action"><button id="btn-team-filter"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3 1A7 7 0 0 0 14.5 5l-.4-2.5h-4L9.7 5A7 7 0 0 0 7.4 6.9l-2.3-1-2 3.4 2 1.5A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.4 2.3-1A7 7 0 0 0 9.5 19l.4 2.5h4l.4-2.5a7 7 0 0 0 2.3-1.9l2.3 1 2-3.4-2-1.5c.1-.4.1-.8.1-1.2Z"/></svg></button></div>
+      </header>
+      <div class="cat-scroll" id="team-cats"></div>
+      <div class="list" id="team-list"></div>
+    </section>
+
+    <!-- ============ 发布占位（中间按钮弹层） ============ -->
+    <section class="page" id="page-publish"></section>
+
+    <!-- ============ 打卡 ============ -->
+    <section class="page" id="page-checkin">
+      <header class="topbar">
+        <div class="brand"><span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-4.6-6.5-9.3A6.5 6.5 0 0 1 12 5a6.5 6.5 0 0 1 6.5 6.7C18.5 16.4 12 21 12 21Z"/><circle cx="12" cy="11.7" r="2.3"/></svg></span>我的足迹</div>
+        <div class="action"><button id="btn-checkin-map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15 9-2 5-4 1 2-5Z"/></svg></button></div>
+      </header>
+      <div class="checkin-stats" id="checkin-stats"></div>
+      <div class="section-head"><h2>打卡记录</h2><span class="more">${state.checkins.length} 次</span></div>
+      <div class="list" id="checkin-list"></div>
+    </section>
+
+    <!-- ============ 攻略 ============ -->
+    <section class="page" id="page-guide">
+      <header class="topbar">
+        <div class="brand"><span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5Z"/><path d="M4 5.5A2.5 2.5 0 0 0 6.5 8H20"/><path d="M9 7h7"/></svg></span>攻略</div>
+        <div class="action"><button id="btn-guide-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button></div>
+      </header>
+      <div class="search-bar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input type="text" id="guide-search-input" placeholder="搜索攻略、地点、标签...">
+      </div>
+      <div class="cat-scroll" id="guide-tags"></div>
+      <div class="list guide-list" id="guide-list"></div>
+    </section>
+
+    <!-- ============ 我的 ============ -->
+    <section class="page" id="page-me">
+      <header class="topbar">
+        <div class="brand"><span class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.7-3.5 3.3-5.5 7-5.5s6.3 2 7 5.5"/></svg></span>我的</div>
+        <div class="action"><button id="btn-me-setting"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3 1A7 7 0 0 0 14.5 5l-.4-2.5h-4L9.7 5A7 7 0 0 0 7.4 6.9l-2.3-1-2 3.4 2 1.5A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.5 2 3.4 2.3-1A7 7 0 0 0 9.5 19l.4 2.5h4l.4-2.5a7 7 0 0 0 2.3-1.9l2.3 1 2-3.4-2-1.5c.1-.4.1-.8.1-1.2Z"/></svg></button></div>
+      </header>
+      <div class="profile" id="me-profile"></div>
+      <div class="me-menu" id="me-menu"></div>
+    </section>
+
+    <!-- ============ 底部 Tab ============ -->
+    <nav class="tabbar" id="tabbar">
+      <button class="tab-item active" data-page="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/></svg><span>首页</span></button>
+      <button class="tab-item" data-page="team"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="17" cy="9" r="2.6"/><path d="M15.5 15.2c2.3.2 4 1.7 4.5 4.3"/></svg><span>组队</span></button>
+      <button class="tab-item tab-publish" data-page="publish">
+        <span class="publish-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span><span>发布</span>
+      </button>
+      <button class="tab-item" data-page="checkin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-4.6-6.5-9.3A6.5 6.5 0 0 1 12 5a6.5 6.5 0 0 1 6.5 6.7C18.5 16.4 12 21 12 21Z"/><circle cx="12" cy="11.7" r="2.3"/></svg><span>打卡</span></button>
+      <button class="tab-item" data-page="me"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c.7-3.5 3.3-5.5 7-5.5s6.3 2 7 5.5"/></svg><span>我的</span></button>
+    </nav>
+
+    <!-- 遮罩 + 底部弹层 -->
+    <div class="mask" id="mask"></div>
+    <div class="sheet" id="sheet"></div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+  </div>
+
+  <script src="js/icons.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
