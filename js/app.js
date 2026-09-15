@@ -98,13 +98,13 @@ function renderHome() {
   if (state.onboarded) renderDecider();
   else $('#home-decider').innerHTML = '';
 
-  // 推荐区：未完成偏好引导时走引导流
+  // 推荐区：未完成偏好引导时，先走引导流 + 默认热门推荐
   if (!state.onboarded) {
-    $('#home-reco-title').textContent = '找到你的周末玩法';
-    $('#home-reco-sub').textContent = '3 步设置偏好';
+    $('#home-reco-title').textContent = '周末去哪儿';
+    $('#home-reco-sub').textContent = '先看看这些热门好去处';
     renderOnboarding();
+    renderDefaultHotList();
   } else {
-    $('#home-reco-title').textContent = '为你推荐';
     // 分类筛选
     const cats = [['all', '全部'], ...Object.entries(CATEGORIES).map(([k, v]) => [k, v.name])];
     $('#home-cats').innerHTML = cats.map(([k, name]) =>
@@ -116,11 +116,25 @@ function renderHome() {
       renderHome();
     }));
 
-    // 推荐列表
-    const list = recommend();
-    $('#home-reco-sub').textContent = `${list.length} 个活动`;
+    // 推荐列表：优先 AI 结果，否则本地推荐
+    let list = [];
+    if (state.aiRecommended.length) {
+      list = state.aiRecommended;
+      $('#home-reco-title').textContent = 'AI 为你推荐';
+      $('#home-reco-sub').textContent = '根据你的偏好生成';
+    } else {
+      list = recommend();
+      $('#home-reco-title').textContent = '为你推荐';
+      $('#home-reco-sub').textContent = `${list.length} 个活动`;
+    }
+
+    // 分类二次过滤（仅对本地推荐有意义，AI 结果也支持按分类筛）
+    if (state.filterPrefs.cat !== 'all') {
+      list = list.filter(a => a.category === state.filterPrefs.cat);
+    }
+
     if (list.length === 0) {
-      $('#home-list').innerHTML = `<div class="empty">${icon('compass')}<p>没有匹配的活动<br>试试放宽预算或切换天气</p></div>`;
+      $('#home-list').innerHTML = `<div class="empty">${icon('compass')}<p>没有匹配的活动<br>试试放宽预算或切换分类</p></div>`;
     } else {
       $('#home-list').innerHTML = list.map((a, i) => activityCard(a, i)).join('');
       bindActivityCards();
@@ -128,9 +142,44 @@ function renderHome() {
   }
 }
 
+/* 默认热门推荐（未引导时也展示一批本地热点，避免页面单一） */
+function renderDefaultHotList() {
+  // 用评分+热度排序取前 4 个作为「热门推荐」
+  const hot = state.activities
+    .map(a => ({ ...a, hot: a.rating * 10 + Math.log(a.likes + 1) * 10 }))
+    .sort((x, y) => y.hot - x.hot)
+    .slice(0, 4);
+  // 追加一个「本地热门」区块到 home-list 末尾（引导卡片下方）
+  const block = document.createElement('div');
+  block.className = 'hot-block';
+  block.id = 'home-hot';
+  block.innerHTML = `
+    <div class="section-head hot-head">
+      <h2>${CITY.name}本地热门</h2>
+      <span class="more">大家都在去</span>
+    </div>
+    <div class="list hot-list">
+      ${hot.map((a, i) => activityCard(a, i)).join('')}
+    </div>
+  `;
+  // 移除旧的热门区块后追加
+  const old = $('#home-hot');
+  if (old) old.remove();
+  $('#home-list').after(block);
+  // 绑定热门卡片点击
+  $$('#home-hot .act-card').forEach(card => card.addEventListener('click', e => {
+    if (e.target.closest('.fav-btn')) return;
+    openActivityDetail(card.dataset.id);
+  }));
+  $$('#home-hot .fav-btn').forEach(b => b.addEventListener('click', e => {
+    e.stopPropagation();
+    toggleFavActivity(b.dataset.fav);
+  }));
+}
+
 /* ---------- 偏好引导流（三步向导） ---------- */
 let obStep = 0;
-const obDraft = { interests: [], budget: null, companions: null };
+const obDraft = { interests: [], budget: null, transport: 'any', distance: null, companions: null, note: '' };
 const OB_COMPANIONS = [
   { key: 'solo', name: '一个人', desc: '自在随心' },
   { key: 'small', name: '2-3 人', desc: '闺蜜/室友搭子' },
@@ -146,8 +195,8 @@ function renderOnboarding() {
       <div class="ob-card">
         <div class="ob-progress"><span class="ob-dot on"></span><span class="ob-dot"></span><span class="ob-dot"></span></div>
         <div class="ob-step-label">第 1 步 · 共 3 步</div>
-        <h3 class="ob-title">这个周末，你想干什么？</h3>
-        <p class="ob-sub">可多选，选你此刻心动的</p>
+        <h3 class="ob-title">这周末，想去哪儿野？</h3>
+        <p class="ob-sub">选你此刻心动的玩法，可多选</p>
         <div class="ob-options">
           ${Object.entries(CATEGORIES).filter(([k]) => k !== 'other').map(([k, c]) => `
             <button class="ob-opt ${obDraft.interests.includes(k) ? 'on' : ''}" data-cat="${k}">
@@ -170,18 +219,41 @@ function renderOnboarding() {
   }
 
   if (obStep === 1) {
+    // 第 2 步：预算 + 交通方式 + 距离范围 合并在一问里
     $('#home-list').innerHTML = `
       <div class="ob-card">
         <div class="ob-progress"><span class="ob-dot on"></span><span class="ob-dot on"></span><span class="ob-dot"></span></div>
         <div class="ob-step-label">第 2 步 · 共 3 步</div>
-        <h3 class="ob-title">这次的花费预算？</h3>
-        <p class="ob-sub">按人均算，学生党友好</p>
+        <h3 class="ob-title">预算多少？怎么去？跑多远？</h3>
+        <p class="ob-sub">一次选好，人均预算 / 交通 / 距离</p>
+
+        <div class="ob-block-label">💰 人均预算</div>
         <div class="ob-options ob-cols-3">
-          ${[30, 50, 100, 200, 500].map(v => `
-            <button class="ob-opt ${obDraft.budget === v ? 'on' : ''}" data-b="${v}">
-              <b>${v === 500 ? '不限' : '≤ ¥' + v}</b>
+          ${BUDGETS.map(b => `
+            <button class="ob-opt ${obDraft.budget === b.value ? 'on' : ''}" data-b="${b.value}">
+              <b>${b.label}</b>
+              <span class="ob-opt-desc">${b.desc}</span>
             </button>`).join('')}
         </div>
+
+        <div class="ob-block-label">🚗 交通方式</div>
+        <div class="ob-options ob-cols-3">
+          ${TRANSPORTS.map(t => `
+            <button class="ob-opt ${obDraft.transport === t.key ? 'on' : ''}" data-t="${t.key}">
+              <b>${t.name}</b>
+              <span class="ob-opt-desc">${t.desc}</span>
+            </button>`).join('')}
+        </div>
+
+        <div class="ob-block-label">📍 距离范围</div>
+        <div class="ob-options ob-cols-2">
+          ${DISTANCES.map(d => `
+            <button class="ob-opt ${obDraft.distance === d.key ? 'on' : ''}" data-d="${d.key}">
+              <b>${d.name}</b>
+              <span class="ob-opt-desc">${d.range}</span>
+            </button>`).join('')}
+        </div>
+
         <div class="ob-nav">
           <button class="btn btn-ghost" id="ob-back">上一步</button>
           <button class="btn btn-primary ob-next" id="ob-next" ${obDraft.budget ? '' : 'disabled'}>
@@ -190,8 +262,16 @@ function renderOnboarding() {
         </div>
       </div>
     `;
-    $$('#home-list .ob-opt').forEach(b => b.addEventListener('click', () => {
+    $$('#home-list .ob-opt[data-b]').forEach(b => b.addEventListener('click', () => {
       obDraft.budget = parseInt(b.dataset.b);
+      renderOnboarding();
+    }));
+    $$('#home-list .ob-opt[data-t]').forEach(b => b.addEventListener('click', () => {
+      obDraft.transport = b.dataset.t;
+      renderOnboarding();
+    }));
+    $$('#home-list .ob-opt[data-d]').forEach(b => b.addEventListener('click', () => {
+      obDraft.distance = b.dataset.d;
       renderOnboarding();
     }));
     $('#ob-back').addEventListener('click', () => { obStep = 0; renderOnboarding(); });
@@ -199,12 +279,15 @@ function renderOnboarding() {
   }
 
   if (obStep === 2) {
+    // 第 3 步：同行人数 + 额外需求备注
     $('#home-list').innerHTML = `
       <div class="ob-card">
         <div class="ob-progress"><span class="ob-dot on"></span><span class="ob-dot on"></span><span class="ob-dot on"></span></div>
         <div class="ob-step-label">第 3 步 · 共 3 步</div>
-        <h3 class="ob-title">和谁一起去？</h3>
-        <p class="ob-sub">组队推荐会用上这个信息</p>
+        <h3 class="ob-title">和谁一起？还有别的想法吗？</h3>
+        <p class="ob-sub">同行人数 + 你的专属需求（选填）</p>
+
+        <div class="ob-block-label">👥 同行人数</div>
         <div class="ob-options ob-cols-3">
           ${OB_COMPANIONS.map(c => `
             <button class="ob-opt ${obDraft.companions === c.key ? 'on' : ''}" data-c="${c.key}">
@@ -212,18 +295,25 @@ function renderOnboarding() {
               <span class="ob-opt-desc">${c.desc}</span>
             </button>`).join('')}
         </div>
+
+        <div class="ob-block-label">✍️ 其他需求（选填）</div>
+        <div class="field">
+          <input type="text" id="ob-note" placeholder="比如：想避开人群、带宠物、有老人小孩、想吃本地菜..." value="${obDraft.note}">
+        </div>
+
         <div class="ob-nav">
           <button class="btn btn-ghost" id="ob-back">上一步</button>
           <button class="btn btn-primary ob-next" id="ob-done" ${obDraft.companions ? '' : 'disabled'}>
-            ${obDraft.companions ? '生成我的推荐' : '选一个'}
+            ${obDraft.companions ? 'AI 帮我推荐' : '选同行人数'}
           </button>
         </div>
       </div>
     `;
-    $$('#home-list .ob-opt').forEach(b => b.addEventListener('click', () => {
+    $$('#home-list .ob-opt[data-c]').forEach(b => b.addEventListener('click', () => {
       obDraft.companions = b.dataset.c;
       renderOnboarding();
     }));
+    $('#ob-note').addEventListener('input', e => { obDraft.note = e.target.value.trim(); });
     $('#ob-back').addEventListener('click', () => { obStep = 1; renderOnboarding(); });
     $('#ob-done').addEventListener('click', finishOnboarding);
   }
@@ -234,21 +324,68 @@ function finishOnboarding() {
   state.user.budget = obDraft.budget || 100;
   state.user.companions = obDraft.companions || 'small';
   state.filterPrefs.budget = state.user.budget;
+  state.tripPrefs.transport = obDraft.transport || 'any';
+  state.tripPrefs.distance = obDraft.distance || 'near';
+  state.tripPrefs.note = obDraft.note || '';
   state.onboarded = true;
   saveState();
   obStep = 0;
+  // 生成推荐（优先走 StepFun AI）
+  generateRecommendations();
+  toast('偏好已记住，正在为你找好去处…');
+}
+
+/* 生成推荐：优先 StepFun AI，失败降级本地推荐 */
+async function generateRecommendations() {
+  const prefs = {
+    interests: state.user.interests,
+    budget: state.user.budget,
+    transport: state.tripPrefs.transport,
+    distance: state.tripPrefs.distance,
+    companion: state.user.companions,
+    note: state.tripPrefs.note,
+    city: CITY.name,
+    weather: state.weather,
+  };
+
+  // 显示 AI 加载态
+  const listEl = $('#home-list');
+  if (listEl) {
+    listEl.innerHTML = `
+      <div class="ai-loading">
+        <div class="ai-spinner"></div>
+        <p>AI 正在根据你的偏好挑选目的地…</p>
+        <span>预算 ${state.user.budget >= 999999 ? '不限' : '≤¥' + state.user.budget} · ${TRANSPORTS.find(t => t.key === state.tripPrefs.transport)?.name || '不限交通'} · ${DISTANCES.find(d => d.key === state.tripPrefs.distance)?.name || '不限距离'}</span>
+      </div>
+    `;
+  }
+
+  const aiResult = await fetchAIRecommendations(prefs);
+
+  if (aiResult && aiResult.length) {
+    state.aiRecommended = aiResult;
+    saveState();
+  } else {
+    state.aiRecommended = [];
+    saveState();
+    toast('AI 暂时不可用，先用本地精选推荐');
+  }
+
   renderHome();
   window.scrollTo({ top: 0, behavior: 'smooth' });
-  toast('偏好已生成，为你挑了这些');
 }
 
 /* 重置偏好（我的页入口） */
 function resetOnboarding() {
   obDraft.interests = [];
   obDraft.budget = null;
+  obDraft.transport = 'any';
+  obDraft.distance = null;
   obDraft.companions = null;
+  obDraft.note = '';
   obStep = 0;
   state.onboarded = false;
+  state.aiRecommended = [];
   saveState();
   switchPage('home');
   toast('重新设置你的偏好吧');
@@ -438,13 +575,15 @@ function activityCard(a, i) {
       <div class="act-img img-ph" data-cat="${a.category}">
         ${coverImg(a.img, a.category, 'cover-photo')}
         <span class="act-cat" style="background:${cat.bg};color:${cat.color}">${icon(cat.icon)}${cat.name}</span>
+        ${a.isAI ? `<span class="ai-badge">${icon('spark')}AI 推荐</span>` : ''}
         <button class="fav-btn ${isFav ? 'on' : ''}" data-fav="${a.id}">${isFav ? icon('heartFill') : icon('heart')}</button>
       </div>
       <div class="act-body">
         <h3>${a.title}</h3>
         ${badges ? `<div class="match-badges">${badges}</div>` : ''}
         <div class="act-meta">
-          <span class="meta-item">${icon('location')}${a.location} · ${a.distance}km</span>
+          <span class="meta-item">${icon('location')}${a.location}${a.distance ? ' · ' + a.distance + 'km' : ''}</span>
+          ${a.transport ? `<span class="meta-item">${icon('route')}${a.transport}</span>` : ''}
           <span class="meta-item">${icon('clock')}${a.date}</span>
         </div>
         <div class="act-tags">${a.tags.map(t => `<span class="mini-tag">${t}</span>`).join('')}</div>

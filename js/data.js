@@ -36,6 +36,147 @@ const WMO_TO_WEATHER = {
 /* 城市坐标（杭州） */
 const CITY = { name: '杭州', lat: 30.2741, lng: 120.1551 };
 
+/* ---------- 交通方式 ---------- */
+const TRANSPORTS = [
+  { key: 'any',    name: '都行',   desc: '不限交通' },
+  { key: 'metro',  name: '地铁/公交', desc: '市内可达' },
+  { key: 'self',   name: '自驾',   desc: '灵活自由' },
+  { key: 'train',  name: '高铁/火车', desc: '跨城 2-4h' },
+  { key: 'plane',  name: '飞机',   desc: '远途 2h 航程' },
+];
+
+/* ---------- 距离范围（距当前城市） ---------- */
+const DISTANCES = [
+  { key: 'within_city', name: '市区内', range: '10km 内',   km: 10 },
+  { key: 'near',        name: '近郊',   range: '50km 内',   km: 50 },
+  { key: 'mid',         name: '周边城市', range: '200km 内', km: 200 },
+  { key: 'far',         name: '远途',   range: '500km+',    km: 500 },
+];
+
+/* ---------- 预算档位（去掉几十元档，100 元起，上不封顶） ---------- */
+const BUDGETS = [
+  { key: 'b100',  value: 100,  label: '≤ ¥100',  desc: '穷游党' },
+  { key: 'b300',  value: 300,  label: '≤ ¥300',  desc: '轻奢一日' },
+  { key: 'b500',  value: 500,  label: '≤ ¥500',  desc: '品质周末' },
+  { key: 'b1000', value: 1000, label: '≤ ¥1000', desc: '跨城玩一趟' },
+  { key: 'b3000', value: 3000, label: '≤ ¥3000', desc: '说走就走' },
+  { key: 'unlimit', value: 999999, label: '不限', desc: '预算自由' },
+];
+
+/* ---------- 同行人数 ---------- */
+const COMPANIONS = {
+  solo: '一个人', small: '2-3 人', group: '4 人以上',
+};
+
+/* ---------- StepFun AI 推荐接口 ---------- */
+const STEPFUN_CONFIG = {
+  endpoint: 'https://api.stepfun.com/v1/chat/completions',
+  apiKey: '3y4thYb47q3bm2ztLTUk1eZvp1IRRx16c8xsSWY8CgQXp0AllDHolFsUwxRlhYj1R',
+  model: 'step-3.7-flash',
+};
+
+/**
+ * 调用 StepFun AI 生成推荐目的地
+ * @param {object} prefs 用户偏好 {interests, budget, transport, distance, companion, note, city, weather}
+ * @returns {Promise<Array|null>} 推荐目的地数组，失败返回 null
+ */
+async function fetchAIRecommendations(prefs) {
+  try {
+    const system = `你是一位专业的周末旅行规划师，擅长根据用户的偏好推荐真实、可执行的目的地。
+你必须严格遵守以下输出格式：只输出一个 JSON 数组，不要输出任何解释文字、markdown 代码块或前后缀。
+数组里每个元素是一个对象，包含以下字段（全部必填）：
+{
+  "title": "目的地/活动名称（具体、真实，如「莫干山轻徒步」「苏州园林一日游」）",
+  "category": "分类，只能是 exhibition/market/show/hike/food/other 之一",
+  "location": "具体地点或区域",
+  "distance": 距离当前城市的公里数（数字）,
+  "cost": 人均花费（数字，元）,
+  "transport": "建议交通方式，如 高铁1.5h / 自驾2h / 地铁直达",
+  "reason": "推荐理由（一句话，说明为什么适合该用户）",
+  "tags": ["2-3个标签"]
+}`;
+    const transportName = prefs.transport && prefs.transport !== 'any'
+      ? (TRANSPORTS.find(t => t.key === prefs.transport)?.name || prefs.transport) : '不限';
+    const distanceName = prefs.distance
+      ? (DISTANCES.find(d => d.key === prefs.distance)?.name || prefs.distance) : '不限';
+    const companionName = prefs.companion ? (COMPANIONS[prefs.companion] || prefs.companion) : '不限';
+    const user = `当前城市：${prefs.city || CITY.name}。
+用户偏好：
+- 兴趣类型：${(prefs.interests || []).map(k => (CATEGORIES[k] ? CATEGORIES[k].name : k)).join('、') || '不限'}
+- 预算：${prefs.budget >= 999999 ? '不限' : prefs.budget + ' 元以内'}
+- 交通方式：${transportName}
+- 距离范围：${distanceName}
+- 同行人数：${companionName}
+- 额外需求：${prefs.note || '无'}
+- 今日天气：${prefs.weather ? (WEATHERS[prefs.weather]?.name || prefs.weather) : '未知'}
+
+请推荐 5 个最适合该用户的真实周末目的地，覆盖不同风格，每个目的地都要符合上述偏好约束。`;
+
+    const res = await fetch(STEPFUN_CONFIG.endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + STEPFUN_CONFIG.apiKey,
+      },
+      body: JSON.stringify({
+        model: STEPFUN_CONFIG.model,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+        temperature: 0.6,
+        max_tokens: 2000,
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    let content = data?.choices?.[0]?.message?.content || '';
+    // 清理可能的 markdown 代码块包裹
+    content = content.replace(/```json/gi, '').replace(/```/g, '').trim();
+    // 提取 JSON 数组
+    const start = content.indexOf('[');
+    const end = content.lastIndexOf(']');
+    if (start === -1 || end === -1) return null;
+    const arr = JSON.parse(content.slice(start, end + 1));
+    if (!Array.isArray(arr)) return null;
+    // 规范化并补全字段
+    // 按分类给一张默认真实封面图（避免 AI 结果全是纯色）
+    const CAT_IMG = {
+      exhibition: '1561214115-f2f134cc4912',
+      market: '1533900298318-6b8da08a523e',
+      show: '1470229722913-7c0e2dbbafd3',
+      hike: '1506905925346-21bda4d32df4',
+      food: '1501339847302-ac426a4a7cbb',
+      other: '1449824913935-59a10b8d2000',
+    };
+    return arr.filter(x => x && x.title).map((x, i) => {
+      const cat = CATEGORIES[x.category] ? x.category : 'other';
+      return {
+        id: 'ai_' + Date.now().toString(36) + '_' + i,
+        title: String(x.title).slice(0, 40),
+        category: cat,
+        location: String(x.location || '待定'),
+        distance: Number(x.distance) || 0,
+        cost: Number(x.cost) || 0,
+        transport: String(x.transport || ''),
+        weatherFit: ['sunny', 'cloudy', 'rain'],
+        crowd: '中',
+        tags: Array.isArray(x.tags) ? x.tags.map(String).slice(0, 3) : [],
+        reason: String(x.reason || 'AI 根据你的偏好为你挑选'),
+        img: uimg(CAT_IMG[cat]),
+        rating: 4.5,
+        likes: 0,
+        date: '本周末',
+        matchReasons: ['AI 个性化推荐', '符合你的偏好'],
+        isAI: true,
+      };
+    });
+  } catch (e) {
+    console.warn('StepFun AI 推荐失败，走本地降级', e);
+    return null;
+  }
+}
+
 /* 获取真实天气（Open-Meteo，失败返回 null 走降级） */
 async function fetchRealWeather() {
   try {
@@ -215,6 +356,12 @@ const DEFAULT_STATE = {
   weather: 'sunny',       // sunny / cloudy / rain
   filterPrefs: { cat: 'all', budget: 100, weather: 'sunny' },
   onboarded: false,       // 是否完成偏好引导
+  tripPrefs: {            // 出行偏好（引导流收集）
+    transport: 'any',     // 交通方式 key
+    distance: 'near',     // 距离范围 key
+    note: '',             // 额外需求备注
+  },
+  aiRecommended: [],      // AI 生成的推荐结果（空则用本地推荐）
 };
 
 /* ---------- 存储层 ---------- */
@@ -241,7 +388,10 @@ function uid(prefix) {
 }
 
 /* ---------- 工具 ---------- */
-function getActivity(id) { return state.activities.find(a => a.id === id); }
+function getActivity(id) {
+  return state.activities.find(a => a.id === id)
+    || (state.aiRecommended || []).find(a => a.id === id);
+}
 function getTeam(id) { return state.teams.find(t => t.id === id); }
 function getCat(c) { return CATEGORIES[c] || CATEGORIES.other; }
 function getWeather(w) { return WEATHERS[w] || WEATHERS.sunny; }
