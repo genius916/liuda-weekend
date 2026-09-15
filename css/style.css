@@ -839,14 +839,17 @@ img { display: block; max-width: 100%; }
   /* 打卡统计更宽 */
   .checkin-stats { grid-template-columns: repeat(3, 1fr); max-width: 720px; }
 
-  /* 弹层在桌面端居中显示 */
+  /* 弹层在桌面端居中显示（关闭时必须移出屏幕外） */
   .sheet {
     max-width: 520px;
     border-radius: var(--r-xl);
     bottom: 50%;
-    transform: translate(-50%, 50%);
+    transform: translate(-50%, 100%) scale(.96);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform .36s var(--ease-out), opacity .3s var(--ease-smooth);
   }
-  .sheet.show { transform: translate(-50%, 50%); }
+  .sheet.show { transform: translate(-50%, 50%) scale(1); opacity: 1; pointer-events: auto; }
 
   /* Hero 更大 */
   .hero { grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -1144,4 +1147,115 @@ img { display: block; max-width: 100%; }
 @media (prefers-color-scheme: dark) {
   .dr-card { background: #222726; border-color: var(--mint-700); }
   .dr-label { color: var(--mint-400); }
+}
+
+/* ============================================================
+   真实封面图 + 推荐依据徽章 + 偏好引导向导
+   ============================================================ */
+
+/* ---------- 封面照片（渐变打底，图片淡入） ---------- */
+.cover-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity .45s var(--ease-smooth);
+}
+.cover-photo.loaded { opacity: 1; }
+
+/* 图片上加一层轻渐变，保证白色角标可读 */
+.act-img .cover-photo.loaded::after { content: none; }
+.act-img::before, .dr-cover::before, .plan-cover::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,.08), transparent 40%);
+  z-index: 1;
+  pointer-events: none;
+}
+.act-cat, .fav-btn, .ck-stars { z-index: 2; }
+
+/* ---------- 推荐依据徽章 ---------- */
+.match-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.match-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: var(--r-full);
+  background: var(--mint-50);
+  color: var(--mint-700);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.match-badge svg { width: 12px; height: 12px; }
+
+/* ---------- 偏好引导向导 ---------- */
+.ob-card {
+  grid-column: 1 / -1;
+  background: #fff;
+  border-radius: var(--r-xl);
+  padding: 28px 24px;
+  box-shadow: var(--shadow-2);
+  border: 1px solid var(--ink-100);
+  max-width: 640px;
+  margin: 0 auto;
+  width: 100%;
+  animation: pageIn .4s var(--ease-out);
+}
+.ob-progress { display: flex; gap: 6px; margin-bottom: 14px; }
+.ob-dot {
+  width: 28px; height: 5px;
+  border-radius: 3px;
+  background: var(--ink-100);
+  transition: background .3s;
+}
+.ob-dot.on { background: var(--mint-500); }
+.ob-step-label { font-size: 12px; color: var(--ink-400); font-weight: 600; letter-spacing: .04em; }
+.ob-title { font-size: 21px; font-weight: 800; margin-top: 6px; }
+.ob-sub { font-size: 13px; color: var(--ink-400); margin-top: 4px; margin-bottom: 18px; }
+.ob-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.ob-cols-3 { grid-template-columns: repeat(3, 1fr); }
+.ob-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 8px;
+  border-radius: var(--r-md);
+  background: var(--ink-50);
+  border: 1.5px solid transparent;
+  color: var(--ink-700);
+  font-size: 13.5px;
+  font-weight: 600;
+  transition: all .2s var(--ease-smooth);
+}
+.ob-opt b { font-size: 15px; }
+.ob-opt-desc { font-size: 11px; color: var(--ink-400); font-weight: 500; }
+.ob-opt.on {
+  background: var(--mint-50);
+  border-color: var(--mint-400);
+  color: var(--mint-700);
+  box-shadow: 0 3px 12px rgba(16,185,129,.18);
+}
+.ob-opt:active { transform: scale(.95); }
+.ob-next, #ob-done { width: 100%; margin-top: 20px; }
+.ob-next[disabled], #ob-done[disabled] { opacity: .45; cursor: not-allowed; }
+.ob-nav { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; margin-top: 20px; }
+
+/* 桌面端引导卡片 */
+@media (min-width: 640px) {
+  .ob-card { padding: 36px 32px; }
+  .ob-title { font-size: 24px; }
 }

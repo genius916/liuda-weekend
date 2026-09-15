@@ -57,6 +57,11 @@ async function fetchRealWeather() {
 }
 
 /* ---------- 演示活动 ---------- */
+/* Unsplash 免费图源（国内可达，加 onerror 降级渐变） */
+function uimg(id) {
+  return `https://images.unsplash.com/photo-${id}?w=800&q=80&auto=format&fit=crop`;
+}
+
 const DEMO_ACTIVITIES = [
   {
     id: 'a1', title: '「山海之间」当代艺术展', category: 'exhibition',
@@ -64,7 +69,7 @@ const DEMO_ACTIVITIES = [
     weatherFit: ['sunny', 'cloudy', 'rain'], crowd: '中',
     tags: ['艺术', '室内', '拍照好看'],
     reason: '评分 4.8，雨天也能逛，学生票半价',
-    img: '', rating: 4.8, likes: 236, date: '本周末',
+    img: uimg('1561214115-f2f134cc4912'), rating: 4.8, likes: 236, date: '本周末',
   },
   {
     id: 'a2', title: '周末手作市集 · 文创夜市', category: 'market',
@@ -72,7 +77,7 @@ const DEMO_ACTIVITIES = [
     weatherFit: ['sunny', 'cloudy'], crowd: '高',
     tags: ['市集', '手作', '夜间'],
     reason: '离校 1.8km，步行可达，20 元能逛一下午',
-    img: '', rating: 4.6, likes: 518, date: '周六 18:00',
+    img: uimg('1533900298318-6b8da08a523e'), rating: 4.6, likes: 518, date: '周六 18:00',
   },
   {
     id: 'a3', title: '独立乐队 livehouse 拼盘', category: 'show',
@@ -80,7 +85,7 @@ const DEMO_ACTIVITIES = [
     weatherFit: ['sunny', 'cloudy', 'rain'], crowd: '高',
     tags: ['音乐', '演出', '夜晚'],
     reason: '3 支本地乐队，气氛超好，预算偏高但值得',
-    img: '', rating: 4.9, likes: 402, date: '周六 20:30',
+    img: uimg('1470229722913-7c0e2dbbafd3'), rating: 4.9, likes: 402, date: '周六 20:30',
   },
   {
     id: 'a4', title: '北山古道轻徒步 · 日出线', category: 'hike',
@@ -88,7 +93,7 @@ const DEMO_ACTIVITIES = [
     weatherFit: ['sunny'], crowd: '低',
     tags: ['徒步', '户外', '免费'],
     reason: '免费，晴天视野绝佳，适合早起党',
-    img: '', rating: 4.7, likes: 189, date: '周日 05:30',
+    img: uimg('1506905925346-21bda4d32df4'), rating: 4.7, likes: 189, date: '周日 05:30',
   },
   {
     id: 'a5', title: '桂花季 · 老巷咖啡馆巡礼', category: 'food',
@@ -96,7 +101,7 @@ const DEMO_ACTIVITIES = [
     weatherFit: ['cloudy', 'rain'], crowd: '中',
     tags: ['美食', '咖啡', '探店'],
     reason: '桂花当季，雨天躲进咖啡馆正合适',
-    img: '', rating: 4.5, likes: 321, date: '本周末',
+    img: uimg('1501339847302-ac426a4a7cbb'), rating: 4.5, likes: 321, date: '本周末',
   },
   {
     id: 'a6', title: '城市骑行 · 环湖落日线', category: 'hike',
@@ -104,7 +109,7 @@ const DEMO_ACTIVITIES = [
     weatherFit: ['sunny', 'cloudy'], crowd: '中',
     tags: ['骑行', '户外', '落日'],
     reason: '共享单车 15 元搞定，傍晚景色封神',
-    img: '', rating: 4.8, likes: 277, date: '周日 16:00',
+    img: uimg('1485965120184-e220f721d03e'), rating: 4.8, likes: 277, date: '周日 16:00',
   },
   {
     id: 'a7', title: '沉浸式剧本杀《迷雾剧院》', category: 'show',
@@ -112,7 +117,7 @@ const DEMO_ACTIVITIES = [
     weatherFit: ['rain'], crowd: '中',
     tags: ['剧本杀', '室内', '组队'],
     reason: '雨天首选，人均 98，需要 6 人成团',
-    img: '', rating: 4.4, likes: 156, date: '周六 14:00',
+    img: uimg('1528605248644-14dd04022da1'), rating: 4.4, likes: 156, date: '周六 14:00',
   },
   {
     id: 'a8', title: '独立纪录片展映周', category: 'exhibition',
@@ -120,7 +125,7 @@ const DEMO_ACTIVITIES = [
     weatherFit: ['sunny', 'cloudy', 'rain'], crowd: '低',
     tags: ['电影', '室内', '文艺'],
     reason: '小众片单，30 元看一整天，人少安静',
-    img: '', rating: 4.6, likes: 98, date: '本周末',
+    img: uimg('1489599849927-2ee91cede3ba'), rating: 4.6, likes: 98, date: '本周末',
   },
 ];
 
@@ -160,25 +165,25 @@ const DEMO_CHECKINS = [
 const DEMO_GUIDES = [
   {
     id: 'g1', title: '杭州周末 48h 不重样攻略', author: '林一', avatarColor: '#8b5cf6',
-    tags: ['citywalk', '美食', '周末'], cover: '', likes: 1289, favs: 320, read: '12.3w',
+    tags: ['citywalk', '美食', '周末'], cover: uimg('1449824913935-59a10b8d2000'), likes: 1289, favs: 320, read: '12.3w',
     excerpt: '从清晨的桂花巷，到深夜的 livehouse，两天逛完杭州最值得去的地方。',
     content: '...',
   },
   {
     id: 'g2', title: '穷游党必看：0 元玩转城市展览', author: '阿哲', avatarColor: '#f59e0b',
-    tags: ['展览', '免费', '省钱'], cover: '', likes: 896, favs: 210, read: '8.9w',
+    tags: ['展览', '免费', '省钱'], cover: uimg('1577720580479-7d839d829c73'), likes: 896, favs: 210, read: '8.9w',
     excerpt: '美术馆、博物馆、独立展厅……这些免费展览质量一点不输收费的。',
     content: '...',
   },
   {
     id: 'g3', title: '雨天不宅指南：室内活动清单', author: '小鹿', avatarColor: '#10b981',
-    tags: ['雨天', '室内', '清单'], cover: '', likes: 743, favs: 158, read: '6.7w',
+    tags: ['雨天', '室内', '清单'], cover: uimg('1531058020387-3be344556be6'), likes: 743, favs: 158, read: '6.7w',
     excerpt: '下雨不是不出门的理由，剧本杀、咖啡馆、展馆……雨天有雨天的玩法。',
     content: '...',
   },
   {
     id: 'g4', title: '北山徒步新手装备清单', author: '林一', avatarColor: '#8b5cf6',
-    tags: ['徒步', '装备', '新手'], cover: '', likes: 512, favs: 96, read: '4.2w',
+    tags: ['徒步', '装备', '新手'], cover: uimg('1551632811-561732d1e306'), likes: 512, favs: 96, read: '4.2w',
     excerpt: '第一次徒步别乱买，这份清单帮你把钱花在刀刃上。',
     content: '...',
   },
@@ -209,6 +214,7 @@ const DEFAULT_STATE = {
   myFavActivities: ['a1'],
   weather: 'sunny',       // sunny / cloudy / rain
   filterPrefs: { cat: 'all', budget: 100, weather: 'sunny' },
+  onboarded: false,       // 是否完成偏好引导
 };
 
 /* ---------- 存储层 ---------- */
@@ -240,27 +246,38 @@ function getTeam(id) { return state.teams.find(t => t.id === id); }
 function getCat(c) { return CATEGORIES[c] || CATEGORIES.other; }
 function getWeather(w) { return WEATHERS[w] || WEATHERS.sunny; }
 
-/* 智能推荐算法：按兴趣 + 天气 + 预算打分 */
+/* 智能推荐算法：按兴趣 + 天气 + 预算打分，并输出推荐依据 */
 function recommend() {
   const { cat, budget, weather } = state.filterPrefs;
   const interests = state.user.interests;
   return state.activities
     .map(a => {
       let score = 0;
+      const reasons = [];   // 推荐依据（结构化）
       // 兴趣匹配（分类命中 +3，标签命中每个 +1）
-      if (interests.includes(a.category)) score += 3;
+      if (interests.includes(a.category)) {
+        score += 3;
+        reasons.push('符合你的兴趣');
+      }
       a.tags.forEach(t => {
         if (interests.some(i => getCat(i).name === t)) score += 1;
       });
       // 天气适配（不适配直接扣到负分）
-      if (a.weatherFit.includes(weather)) score += 2;
+      if (a.weatherFit.includes(weather)) {
+        score += 2;
+        reasons.push('天气适合');
+      }
       else score -= 5;
       // 预算（预算内 +2，超出越多扣越多）
-      if (a.cost <= budget) score += 2;
+      if (a.cost <= budget) {
+        score += 2;
+        reasons.push('预算内');
+      }
       else score -= Math.ceil((a.cost - budget) / 50);
       // 热度加成
       score += a.rating / 10;
-      return { ...a, score };
+      if (a.rating >= 4.7) reasons.push('高分好评');
+      return { ...a, score, matchReasons: reasons };
     })
     .filter(a => {
       if (cat !== 'all' && a.category !== cat) return false;

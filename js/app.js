@@ -94,29 +94,164 @@ function renderHome() {
   // 天气按钮
   $('#btn-weather').innerHTML = icon(w.icon);
 
-  // 随机决策器
-  renderDecider();
+  // 随机决策器（完成引导后才显示）
+  if (state.onboarded) renderDecider();
+  else $('#home-decider').innerHTML = '';
 
-  // 分类筛选
-  const cats = [['all', '全部'], ...Object.entries(CATEGORIES).map(([k, v]) => [k, v.name])];
-  $('#home-cats').innerHTML = cats.map(([k, name]) =>
-    `<button class="chip ${state.filterPrefs.cat === k ? 'on' : ''}" data-cat="${k}">${name}</button>`
-  ).join('');
-  $$('#home-cats .chip').forEach(c => c.addEventListener('click', () => {
-    state.filterPrefs.cat = c.dataset.cat;
-    saveState();
-    renderHome();
-  }));
-
-  // 推荐列表
-  const list = recommend();
-  $('#home-reco-sub').textContent = `${list.length} 个活动`;
-  if (list.length === 0) {
-    $('#home-list').innerHTML = `<div class="empty">${icon('compass')}<p>没有匹配的活动<br>试试放宽预算或切换天气</p></div>`;
+  // 推荐区：未完成偏好引导时走引导流
+  if (!state.onboarded) {
+    $('#home-reco-title').textContent = '找到你的周末玩法';
+    $('#home-reco-sub').textContent = '3 步设置偏好';
+    renderOnboarding();
   } else {
-    $('#home-list').innerHTML = list.map((a, i) => activityCard(a, i)).join('');
-    bindActivityCards();
+    $('#home-reco-title').textContent = '为你推荐';
+    // 分类筛选
+    const cats = [['all', '全部'], ...Object.entries(CATEGORIES).map(([k, v]) => [k, v.name])];
+    $('#home-cats').innerHTML = cats.map(([k, name]) =>
+      `<button class="chip ${state.filterPrefs.cat === k ? 'on' : ''}" data-cat="${k}">${name}</button>`
+    ).join('');
+    $$('#home-cats .chip').forEach(c => c.addEventListener('click', () => {
+      state.filterPrefs.cat = c.dataset.cat;
+      saveState();
+      renderHome();
+    }));
+
+    // 推荐列表
+    const list = recommend();
+    $('#home-reco-sub').textContent = `${list.length} 个活动`;
+    if (list.length === 0) {
+      $('#home-list').innerHTML = `<div class="empty">${icon('compass')}<p>没有匹配的活动<br>试试放宽预算或切换天气</p></div>`;
+    } else {
+      $('#home-list').innerHTML = list.map((a, i) => activityCard(a, i)).join('');
+      bindActivityCards();
+    }
   }
+}
+
+/* ---------- 偏好引导流（三步向导） ---------- */
+let obStep = 0;
+const obDraft = { interests: [], budget: null, companions: null };
+const OB_COMPANIONS = [
+  { key: 'solo', name: '一个人', desc: '自在随心' },
+  { key: 'small', name: '2-3 人', desc: '闺蜜/室友搭子' },
+  { key: 'group', name: '4 人以上', desc: '社团/班级团建' },
+];
+
+function renderOnboarding() {
+  // 隐藏分类筛选（引导完成后再出现）
+  $('#home-cats').innerHTML = '';
+
+  if (obStep === 0) {
+    $('#home-list').innerHTML = `
+      <div class="ob-card">
+        <div class="ob-progress"><span class="ob-dot on"></span><span class="ob-dot"></span><span class="ob-dot"></span></div>
+        <div class="ob-step-label">第 1 步 · 共 3 步</div>
+        <h3 class="ob-title">这个周末，你想干什么？</h3>
+        <p class="ob-sub">可多选，选你此刻心动的</p>
+        <div class="ob-options">
+          ${Object.entries(CATEGORIES).filter(([k]) => k !== 'other').map(([k, c]) => `
+            <button class="ob-opt ${obDraft.interests.includes(k) ? 'on' : ''}" data-cat="${k}">
+              <span class="ii-icon" style="--c:${c.color};--cbg:${c.bg}">${icon(c.icon)}</span>
+              ${c.name}
+            </button>`).join('')}
+        </div>
+        <button class="btn btn-primary ob-next" id="ob-next" ${obDraft.interests.length ? '' : 'disabled'}>
+          ${obDraft.interests.length ? '下一步' : '至少选一个'}
+        </button>
+      </div>
+    `;
+    $$('#home-list .ob-opt').forEach(b => b.addEventListener('click', () => {
+      const k = b.dataset.cat;
+      const i = obDraft.interests.indexOf(k);
+      if (i >= 0) obDraft.interests.splice(i, 1); else obDraft.interests.push(k);
+      renderOnboarding();
+    }));
+    $('#ob-next').addEventListener('click', () => { obStep = 1; renderOnboarding(); });
+  }
+
+  if (obStep === 1) {
+    $('#home-list').innerHTML = `
+      <div class="ob-card">
+        <div class="ob-progress"><span class="ob-dot on"></span><span class="ob-dot on"></span><span class="ob-dot"></span></div>
+        <div class="ob-step-label">第 2 步 · 共 3 步</div>
+        <h3 class="ob-title">这次的花费预算？</h3>
+        <p class="ob-sub">按人均算，学生党友好</p>
+        <div class="ob-options ob-cols-3">
+          ${[30, 50, 100, 200, 500].map(v => `
+            <button class="ob-opt ${obDraft.budget === v ? 'on' : ''}" data-b="${v}">
+              <b>${v === 500 ? '不限' : '≤ ¥' + v}</b>
+            </button>`).join('')}
+        </div>
+        <div class="ob-nav">
+          <button class="btn btn-ghost" id="ob-back">上一步</button>
+          <button class="btn btn-primary ob-next" id="ob-next" ${obDraft.budget ? '' : 'disabled'}>
+            ${obDraft.budget ? '下一步' : '选一个预算'}
+          </button>
+        </div>
+      </div>
+    `;
+    $$('#home-list .ob-opt').forEach(b => b.addEventListener('click', () => {
+      obDraft.budget = parseInt(b.dataset.b);
+      renderOnboarding();
+    }));
+    $('#ob-back').addEventListener('click', () => { obStep = 0; renderOnboarding(); });
+    $('#ob-next').addEventListener('click', () => { obStep = 2; renderOnboarding(); });
+  }
+
+  if (obStep === 2) {
+    $('#home-list').innerHTML = `
+      <div class="ob-card">
+        <div class="ob-progress"><span class="ob-dot on"></span><span class="ob-dot on"></span><span class="ob-dot on"></span></div>
+        <div class="ob-step-label">第 3 步 · 共 3 步</div>
+        <h3 class="ob-title">和谁一起去？</h3>
+        <p class="ob-sub">组队推荐会用上这个信息</p>
+        <div class="ob-options ob-cols-3">
+          ${OB_COMPANIONS.map(c => `
+            <button class="ob-opt ${obDraft.companions === c.key ? 'on' : ''}" data-c="${c.key}">
+              <b>${c.name}</b>
+              <span class="ob-opt-desc">${c.desc}</span>
+            </button>`).join('')}
+        </div>
+        <div class="ob-nav">
+          <button class="btn btn-ghost" id="ob-back">上一步</button>
+          <button class="btn btn-primary ob-next" id="ob-done" ${obDraft.companions ? '' : 'disabled'}>
+            ${obDraft.companions ? '生成我的推荐' : '选一个'}
+          </button>
+        </div>
+      </div>
+    `;
+    $$('#home-list .ob-opt').forEach(b => b.addEventListener('click', () => {
+      obDraft.companions = b.dataset.c;
+      renderOnboarding();
+    }));
+    $('#ob-back').addEventListener('click', () => { obStep = 1; renderOnboarding(); });
+    $('#ob-done').addEventListener('click', finishOnboarding);
+  }
+}
+
+function finishOnboarding() {
+  state.user.interests = obDraft.interests.length ? obDraft.interests : ['exhibition', 'market', 'hike'];
+  state.user.budget = obDraft.budget || 100;
+  state.user.companions = obDraft.companions || 'small';
+  state.filterPrefs.budget = state.user.budget;
+  state.onboarded = true;
+  saveState();
+  obStep = 0;
+  renderHome();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  toast('偏好已生成，为你挑了这些');
+}
+
+/* 重置偏好（我的页入口） */
+function resetOnboarding() {
+  obDraft.interests = [];
+  obDraft.budget = null;
+  obDraft.companions = null;
+  obStep = 0;
+  state.onboarded = false;
+  saveState();
+  switchPage('home');
+  toast('重新设置你的偏好吧');
 }
 
 /* ---------- 随机决策器 ---------- */
@@ -149,6 +284,7 @@ function renderDecider() {
         </div>
         <div class="dr-card" data-id="${a.id}" data-cat="${a.category}">
           <div class="dr-cover img-ph" data-cat="${a.category}">
+            ${coverImg(a.img, a.category, 'cover-photo')}
             <span class="act-cat" style="background:${cat.bg};color:${cat.color}">${icon(cat.icon)}${cat.name}</span>
           </div>
           <div class="dr-body">
@@ -227,6 +363,7 @@ function openPlanSheet(activityId) {
   openSheet(`
     <div class="plan">
       <div class="plan-cover img-ph" data-cat="${a.category}">
+        ${coverImg(a.img, a.category, 'cover-photo')}
         <span class="act-cat" style="background:${cat.bg};color:${cat.color}">${icon(cat.icon)}${cat.name}</span>
       </div>
       <h2>${a.title}</h2>
@@ -284,18 +421,28 @@ function openPlanSheet(activityId) {
   });
 }
 
+/* 封面图：有图用图（onerror 降级渐变），无图用渐变 */
+function coverImg(src, catKey, cls) {
+  if (!src) return '';
+  return `<img src="${src}" alt="" loading="lazy" class="${cls}"
+    onerror="this.remove()" onload="this.classList.add('loaded')">`;
+}
+
 function activityCard(a, i) {
   const cat = getCat(a.category);
   const isFav = state.myFavActivities.includes(a.id);
   const fit = a.weatherFit.includes(state.weather);
+  const badges = (a.matchReasons || []).map(r => `<span class="match-badge">${icon('check')}${r}</span>`).join('');
   return `
     <article class="card act-card" data-id="${a.id}" style="animation-delay:${i * 50}ms">
       <div class="act-img img-ph" data-cat="${a.category}">
+        ${coverImg(a.img, a.category, 'cover-photo')}
         <span class="act-cat" style="background:${cat.bg};color:${cat.color}">${icon(cat.icon)}${cat.name}</span>
         <button class="fav-btn ${isFav ? 'on' : ''}" data-fav="${a.id}">${isFav ? icon('heartFill') : icon('heart')}</button>
       </div>
       <div class="act-body">
         <h3>${a.title}</h3>
+        ${badges ? `<div class="match-badges">${badges}</div>` : ''}
         <div class="act-meta">
           <span class="meta-item">${icon('location')}${a.location} · ${a.distance}km</span>
           <span class="meta-item">${icon('clock')}${a.date}</span>
@@ -385,7 +532,8 @@ function openActivityDetail(id) {
   const isFav = state.myFavActivities.includes(id);
   openSheet(`
     <div class="detail">
-      <div class="detail-img img-ph">
+      <div class="detail-img img-ph" data-cat="${a.category}">
+        ${coverImg(a.img, a.category, 'cover-photo')}
         <span class="act-cat" style="background:${cat.bg};color:${cat.color}">${icon(cat.icon)}${cat.name}</span>
       </div>
       <h2>${a.title}</h2>
@@ -594,6 +742,7 @@ function checkinCard(c, i) {
   return `
     <article class="card checkin-card" style="animation-delay:${i * 50}ms">
       <div class="ck-img img-ph" data-cat="${a.category}">
+        ${coverImg(a && a.img, a && a.category, 'cover-photo')}
         <span class="act-cat" style="background:${cat.bg};color:${cat.color}">${icon(cat.icon)}${cat.name}</span>
         <div class="ck-stars">${'★'.repeat(c.rating)}${'☆'.repeat(5 - c.rating)}</div>
       </div>
@@ -765,7 +914,9 @@ function guideCard(g) {
   const coverIdx = parseInt(g.id.replace(/\D/g, '') || '0', 10) % 5;
   return `
     <article class="card guide-card" data-id="${g.id}">
-      <div class="g-cover img-ph" data-cover="${coverIdx}"></div>
+      <div class="g-cover img-ph" data-cover="${coverIdx}">
+        ${coverImg(g.cover, '', 'cover-photo')}
+      </div>
       <div class="g-body">
         <h3>${g.title}</h3>
         <p class="g-excerpt">${g.excerpt}</p>
@@ -794,7 +945,9 @@ function openGuideDetail(id) {
   const isFav = state.myFavGuides.includes(id);
   openSheet(`
     <div class="detail guide-detail">
-      <div class="g-cover img-ph" style="height:160px"></div>
+      <div class="g-cover img-ph" style="height:160px">
+        ${coverImg(g.cover, '', 'cover-photo')}
+      </div>
       <h2>${g.title}</h2>
       <div class="g-author-row">${avatar(g.author, g.avatarColor)} ${g.author} · ${g.read} 阅读</div>
       <div class="g-tags">${g.tags.map(t => `<span class="chip">#${t}</span>`).join('')}</div>
@@ -840,6 +993,7 @@ function renderMe() {
     </div>
     <div class="me-list">
       <button class="me-row" id="me-interest">${icon('flame')}<span>兴趣偏好</span>${icon('arrowRight')}</button>
+      <button class="me-row" id="me-reonboard">${icon('compass')}<span>重新设置推荐偏好</span>${icon('arrowRight')}</button>
       <button class="me-row" id="me-about">${icon('compass')}<span>关于溜达</span>${icon('arrowRight')}</button>
     </div>
   `;
@@ -855,6 +1009,7 @@ function renderMe() {
   $('#me-teams').addEventListener('click', () => { switchPage('team'); teamFilter = 'all'; renderTeam(); });
   $('#me-checkins').addEventListener('click', () => switchPage('checkin'));
   $('#me-interest').addEventListener('click', openInterestSheet);
+  $('#me-reonboard').addEventListener('click', resetOnboarding);
   $('#me-about').addEventListener('click', () => openSheet(`
     <h3>关于溜达</h3>
     <p style="color:var(--ink-500);line-height:1.7;font-size:14px">
