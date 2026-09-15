@@ -54,6 +54,11 @@ function openSheet(html) {
 function closeSheet() {
   $('#mask').classList.remove('show');
   $('#sheet').classList.remove('show');
+  // 清理地图实例，避免重复初始化
+  if (typeof window.__lastMapCleanup === 'function') {
+    window.__lastMapCleanup();
+    window.__lastMapCleanup = null;
+  }
 }
 
 /* ---------- 首页 ---------- */
@@ -114,7 +119,7 @@ function activityCard(a, i) {
   const fit = a.weatherFit.includes(state.weather);
   return `
     <article class="card act-card" data-id="${a.id}" style="animation-delay:${i * 50}ms">
-      <div class="act-img img-ph">
+      <div class="act-img img-ph" data-cat="${a.category}">
         <span class="act-cat" style="background:${cat.bg};color:${cat.color}">${icon(cat.icon)}${cat.name}</span>
         <button class="fav-btn ${isFav ? 'on' : ''}" data-fav="${a.id}">${isFav ? icon('heartFill') : icon('heart')}</button>
       </div>
@@ -395,10 +400,15 @@ function renderCheckin() {
   const total = state.checkins.length;
   const places = new Set(state.checkins.map(c => c.activityId)).size;
   $('#checkin-stats').innerHTML = `
-    <div class="cs-item"><b>${total}</b><span>打卡次数</span></div>
-    <div class="cs-item"><b>${places}</b><span>去过地点</span></div>
-    <div class="cs-item"><b>${state.user.signCount}</b><span>连续签到</span></div>
+    <div class="cs-item"><b data-num="${total}">0</b><span>打卡次数</span></div>
+    <div class="cs-item"><b data-num="${places}">0</b><span>去过地点</span></div>
+    <div class="cs-item"><b data-num="${state.user.signCount}">0</b><span>连续签到</span></div>
   `;
+  // 数字滚动动画
+  $$('#checkin-stats b').forEach((b, i) => {
+    const target = parseInt(b.dataset.num, 10);
+    setTimeout(() => animateNumber(b, target, 600 + i * 120), 80);
+  });
 
   if (state.checkins.length === 0) {
     $('#checkin-list').innerHTML = `<div class="empty">${icon('checkin')}<p>还没有打卡记录<br>去过的活动可以打卡哦</p></div>`;
@@ -412,7 +422,7 @@ function checkinCard(c, i) {
   const cat = a ? getCat(a.category) : getCat('other');
   return `
     <article class="card checkin-card" style="animation-delay:${i * 50}ms">
-      <div class="ck-img img-ph">
+      <div class="ck-img img-ph" data-cat="${a.category}">
         <span class="act-cat" style="background:${cat.bg};color:${cat.color}">${icon(cat.icon)}${cat.name}</span>
         <div class="ck-stars">${'★'.repeat(c.rating)}${'☆'.repeat(5 - c.rating)}</div>
       </div>
@@ -426,6 +436,63 @@ function checkinCard(c, i) {
       </div>
     </article>
   `;
+}
+
+/* 足迹地图：Leaflet + OpenStreetMap，免费无需密钥 */
+function openFootprintMap() {
+  openSheet(`
+    <h3>我的探索足迹</h3>
+    <div id="footprint-map" style="height:360px;border-radius:var(--r-md);overflow:hidden;z-index:0;"></div>
+    <p style="font-size:12px;color:var(--ink-400);margin-top:10px;text-align:center;">
+      已点亮 ${state.checkins.length} 个地点 · 地图由 OpenStreetMap 提供
+    </p>
+  `);
+
+  // 延迟到弹层动画完成后再初始化地图（否则尺寸为 0）
+  setTimeout(() => {
+    const elMap = document.getElementById('footprint-map');
+    if (!elMap || typeof L === 'undefined') return;
+
+    // 取打卡点坐标，无坐标则用杭州中心
+    const points = state.checkins.filter(c => c.lat && c.lng);
+    const center = points.length
+      ? [points[0].lat, points[0].lng]
+      : [30.2741, 120.1551];
+
+    const map = L.map('footprint-map', { scrollWheelZoom: false }).setView(center, 13);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap contributors',
+    }).addTo(map);
+
+    // 自定义薄荷色打卡标记
+    const markerIcon = L.divIcon({
+      className: 'ld-marker',
+      html: `<div class="ld-marker-pin"></div>`,
+      iconSize: [22, 22],
+      iconAnchor: [11, 22],
+    });
+
+    points.forEach(c => {
+      L.marker([c.lat, c.lng], { icon: markerIcon })
+        .addTo(map)
+        .bindPopup(`<b>${c.title}</b><br>${c.date} · 评分 ${c.rating} 星`);
+    });
+
+    // 有多个点时自动缩放视野
+    if (points.length > 1) {
+      map.fitBounds(points.map(p => [p.lat, p.lng]), { padding: [40, 40] });
+    }
+
+    // 关闭弹层时销毁地图，避免重复初始化报错
+    const onClose = () => {
+      map.remove();
+      $('#mask').removeEventListener('click', onClose);
+    };
+    // 用一次性标记，供 closeSheet 后清理
+    window.__lastMapCleanup = onClose;
+  }, 350);
 }
 
 function openCheckinSheet(activityId) {
@@ -524,9 +591,10 @@ function renderGuide() {
 
 function guideCard(g) {
   const isFav = state.myFavGuides.includes(g.id);
+  const coverIdx = parseInt(g.id.replace(/\D/g, '') || '0', 10) % 5;
   return `
     <article class="card guide-card" data-id="${g.id}">
-      <div class="g-cover img-ph"></div>
+      <div class="g-cover img-ph" data-cover="${coverIdx}"></div>
       <div class="g-body">
         <h3>${g.title}</h3>
         <p class="g-excerpt">${g.excerpt}</p>
@@ -588,10 +656,10 @@ function renderMe() {
 
   $('#me-menu').innerHTML = `
     <div class="me-stats">
-      <div class="ms-item"><b>${u.signCount}</b><span>连续签到</span></div>
-      <div class="ms-item"><b>${state.checkins.length}</b><span>打卡</span></div>
-      <div class="ms-item"><b>${u.favCount}</b><span>收藏</span></div>
-      <div class="ms-item"><b>${state.myTeams.length}</b><span>组队</span></div>
+      <div class="ms-item"><b data-num="${u.signCount}">0</b><span>连续签到</span></div>
+      <div class="ms-item"><b data-num="${state.checkins.length}">0</b><span>打卡</span></div>
+      <div class="ms-item"><b data-num="${u.favCount}">0</b><span>收藏</span></div>
+      <div class="ms-item"><b data-num="${state.myTeams.length}">0</b><span>组队</span></div>
     </div>
     <div class="me-list">
       <button class="me-row" id="me-favs">${icon('heart')}<span>我的收藏</span>${icon('arrowRight')}</button>
@@ -604,6 +672,12 @@ function renderMe() {
       <button class="me-row" id="me-about">${icon('compass')}<span>关于溜达</span>${icon('arrowRight')}</button>
     </div>
   `;
+
+  // 数字滚动动画
+  $$('.me-stats b').forEach((b, i) => {
+    const target = parseInt(b.dataset.num, 10);
+    setTimeout(() => animateNumber(b, target, 600 + i * 100), 80);
+  });
 
   $('#me-edit').addEventListener('click', openEditName);
   $('#me-favs').addEventListener('click', () => { switchPage('guide'); guideTag = '全部'; renderGuide(); });
@@ -691,14 +765,7 @@ function init() {
 
   // 打卡地图按钮（演示）
   $('#btn-checkin-map').addEventListener('click', () => {
-    openSheet(`
-      <h3>我的探索足迹</h3>
-      <div class="footprint-map">
-        ${icon('location')}
-        <p>已点亮 ${new Set(state.checkins.map(c => c.activityId)).size} 个地点</p>
-        <span>地图组件占位（可接入高德/腾讯地图）</span>
-      </div>
-    `);
+    openFootprintMap();
   });
 
   // 通知按钮（演示）
@@ -710,8 +777,47 @@ function init() {
   // 我的设置（演示）
   $('#btn-me-setting').addEventListener('click', () => toast('设置功能开发中'));
 
+  // 返回顶部按钮
+  initBackTop();
+
+  // 顶部导航滚动阴影
+  initScrollShadow();
+
   // 初次渲染
   renderHome();
+}
+
+/* ---------- 返回顶部 ---------- */
+function initBackTop() {
+  const btn = el(`<button class="back-top" id="back-top" aria-label="返回顶部">${icon('back')}</button>`);
+  document.getElementById('app').appendChild(btn);
+  btn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+  window.addEventListener('scroll', () => {
+    btn.classList.toggle('show', window.scrollY > 400);
+  }, { passive: true });
+}
+
+/* ---------- 顶部导航滚动阴影 ---------- */
+function initScrollShadow() {
+  const bar = $('#tabbar');
+  if (!bar) return;
+  window.addEventListener('scroll', () => {
+    bar.classList.toggle('scrolled', window.scrollY > 10);
+  }, { passive: true });
+}
+
+/* ---------- 数字滚动动画 ---------- */
+function animateNumber(el, target, duration = 800) {
+  const start = performance.now();
+  const from = 0;
+  function step(now) {
+    const p = Math.min((now - start) / duration, 1);
+    const eased = 1 - Math.pow(1 - p, 3); // easeOutCubic
+    const val = Math.round(from + (target - from) * eased);
+    el.textContent = val;
+    if (p < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
 }
 
 document.addEventListener('DOMContentLoaded', init);

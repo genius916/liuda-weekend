@@ -117,9 +117,9 @@ const DEMO_TEAMS = [
 
 /* ---------- 演示打卡 ---------- */
 const DEMO_CHECKINS = [
-  { id: 'c1', activityId: 'a1', title: '山海之间艺术展', date: '2026-09-06', note: '雨天人少，看展体验拉满，学生票半价真香。', rating: 5, img: '', likes: 45 },
-  { id: 'c2', activityId: 'a4', title: '北山古道徒步', date: '2026-08-30', note: '日出绝了！就是起床太痛苦，下山膝盖酸。', rating: 5, img: '', likes: 61 },
-  { id: 'c3', activityId: 'a6', title: '环湖骑行', date: '2026-08-23', note: '落日线名不虚传，骑行 6km 完全不累。', rating: 4, img: '', likes: 33 },
+  { id: 'c1', activityId: 'a1', title: '山海之间艺术展', date: '2026-09-06', note: '雨天人少，看展体验拉满，学生票半价真香。', rating: 5, img: '', likes: 45, lat: 30.2741, lng: 120.1551 },
+  { id: 'c2', activityId: 'a4', title: '北山古道徒步', date: '2026-08-30', note: '日出绝了！就是起床太痛苦，下山膝盖酸。', rating: 5, img: '', likes: 61, lat: 30.3150, lng: 120.0980 },
+  { id: 'c3', activityId: 'a6', title: '环湖骑行', date: '2026-08-23', note: '落日线名不虚传，骑行 6km 完全不累。', rating: 4, img: '', likes: 33, lat: 30.2590, lng: 120.1300 },
 ];
 
 /* ---------- 演示攻略 ---------- */

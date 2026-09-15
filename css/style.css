@@ -78,7 +78,7 @@ img { display: block; max-width: 100%; }
 
 /* ============ App 骨架 ============ */
 .app {
-  max-width: 480px;
+  width: 100%;
   margin: 0 auto;
   min-height: 100vh;
   background: var(--ink-50);
@@ -86,16 +86,12 @@ img { display: block; max-width: 100%; }
   padding-bottom: calc(72px + env(safe-area-inset-bottom));
 }
 
-/* 桌面端：居中并加边框，模拟手机 */
-@media (min-width: 520px) {
-  body { background: #e6eae8; }
-  .app {
-    min-height: calc(100vh - 40px);
-    margin: 20px auto;
-    border-radius: var(--r-xl);
-    box-shadow: var(--shadow-3);
-    overflow: hidden;
-  }
+/* 内容容器：随视口流式扩展 */
+.wrap {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
 }
 
 /* ============ 底部 Tab 导航 ============ */
@@ -749,3 +745,241 @@ img { display: block; max-width: 100%; }
 .footprint-map svg { width: 50px; height: 50px; color: var(--mint-400); margin-bottom: 12px; }
 .footprint-map p { font-size: 15px; color: var(--ink-700); font-weight: 600; margin-bottom: 6px; }
 .footprint-map span { font-size: 12px; }
+
+/* ============================================================
+   响应式多端布局（覆盖移动端默认样式）
+   断点：≥640px 平板  /  ≥1024px 桌面
+   ============================================================ */
+
+/* ---------- 平板 & 桌面：铺满 + 顶部导航 ---------- */
+@media (min-width: 640px) {
+  body { background: var(--ink-50); }
+
+  .app {
+    max-width: none;
+    padding-bottom: 0;
+    min-height: 100vh;
+  }
+
+  /* 底部 Tab 变为顶部导航栏 */
+  .tabbar {
+    top: 0;
+    bottom: auto;
+    left: 0;
+    transform: none;
+    width: 100%;
+    max-width: none;
+    height: 64px;
+    padding-bottom: 0;
+    border-top: none;
+    border-bottom: 1px solid var(--ink-100);
+    background: rgba(255,255,255,.88);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+  }
+  .tab-item {
+    flex-direction: row;
+    gap: 6px;
+    padding: 8px 16px;
+    font-size: 14px;
+    border-radius: var(--r-full);
+    height: 40px;
+  }
+  .tab-item svg { width: 20px; height: 20px; }
+  .tab-item.active { background: var(--mint-50); }
+
+  /* 发布按钮在顶部导航里不再凸起 */
+  .tab-publish { margin-top: 0; }
+  .tab-publish .publish-btn {
+    width: auto; height: 40px;
+    padding: 0 18px;
+    border-radius: var(--r-full);
+    font-size: 14px;
+  }
+  .tab-publish .publish-btn svg { width: 18px; height: 18px; }
+  .tab-publish .publish-btn::after { content: '发布'; font-size: 14px; font-weight: 600; }
+  .tab-publish > span:last-child { display: none; }
+
+  /* 内容区顶到导航下方 */
+  .page { padding-top: 0; }
+  .topbar { padding-top: 24px; max-width: 1200px; margin-left: auto; margin-right: auto; }
+
+  /* 内容容器加宽 */
+  .wrap, .list, .section-head, .cat-scroll, .hero,
+  .checkin-stats, .profile, .me-list, .me-stats, .search-bar {
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .cat-scroll { padding-left: 20px; padding-right: 20px; }
+
+  /* 推荐/组队列表变多栏网格 */
+  .list { display: grid; gap: 20px; grid-template-columns: repeat(2, 1fr); }
+
+  /* 攻略列表 */
+  .guide-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+  .guide-card { margin-bottom: 0; }
+
+  /* 打卡统计更宽 */
+  .checkin-stats { grid-template-columns: repeat(3, 1fr); max-width: 720px; }
+
+  /* 弹层在桌面端居中显示 */
+  .sheet {
+    max-width: 520px;
+    border-radius: var(--r-xl);
+    bottom: 50%;
+    transform: translate(-50%, 50%);
+  }
+  .sheet.show { transform: translate(-50%, 50%); }
+
+  /* Hero 更大 */
+  .hero { grid-template-columns: 1fr 1fr; gap: 16px; }
+}
+
+/* ---------- 桌面端（≥1024px）：三栏 + 更宽 ---------- */
+@media (min-width: 1024px) {
+  .list { grid-template-columns: repeat(3, 1fr); }
+  .guide-list { grid-template-columns: repeat(3, 1fr); }
+
+  /* 桌面端活动卡片图更高 */
+  .act-img { height: 180px; }
+  .g-cover { height: 160px; }
+
+  /* 首页 Hero 与内容之间留白更舒展 */
+  .hero { max-width: 1200px; }
+  .section-head { padding-top: 28px; }
+
+  /* 更大的可读字号 */
+  .act-body h3 { font-size: 17px; }
+  .act-price { font-size: 18px; }
+}
+
+/* ---------- 超宽屏（≥1400px）--------- */
+@media (min-width: 1400px) {
+  .list { grid-template-columns: repeat(4, 1fr); }
+  .guide-list { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* ============ 足迹地图（Leaflet） ============ */
+.ld-marker { background: none; border: none; }
+.ld-marker-pin {
+  width: 22px; height: 22px;
+  background: var(--mint-500);
+  border: 3px solid #fff;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  box-shadow: 0 2px 6px rgba(16,185,129,.5);
+}
+.leaflet-popup-content-wrapper { border-radius: 12px; }
+.leaflet-popup-content { font-size: 13px; line-height: 1.5; }
+.leaflet-container { font-family: var(--font-body); }
+
+/* 弹层内地图层级修复 */
+.sheet { z-index: 201; }
+.sheet .leaflet-pane, .sheet .leaflet-control { z-index: 0; }
+.sheet .leaflet-control { z-index: 5; }
+
+/* ============================================================
+   视觉增强：质感封面 + 骨架屏 + 动效细节
+   ============================================================ */
+
+/* ---------- 分类质感封面（替代纯色 img-ph） ---------- */
+.act-img, .g-cover, .ck-img, .detail-img {
+  position: relative;
+  overflow: hidden;
+}
+.act-img::after, .g-cover::after, .ck-img::after, .detail-img::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 80% 20%, rgba(255,255,255,.35), transparent 45%),
+    radial-gradient(circle at 20% 80%, rgba(255,255,255,.2), transparent 40%);
+  pointer-events: none;
+}
+
+/* 展览：紫调 */
+.act-img[data-cat="exhibition"], .g-cover[data-cat="exhibition"] {
+  background: linear-gradient(135deg, #d9c8ff, #a78bfa);
+}
+/* 市集：橙调 */
+.act-img[data-cat="market"] { background: linear-gradient(135deg, #ffe3b3, #fbbf24); }
+/* 演出：粉调 */
+.act-img[data-cat="show"] { background: linear-gradient(135deg, #ffc8dd, #f472b6); }
+/* 徒步：绿调 */
+.act-img[data-cat="hike"] { background: linear-gradient(135deg, #b7ecd3, #34d399); }
+/* 美食：红调 */
+.act-img[data-cat="food"] { background: linear-gradient(135deg, #ffc9c9, #f87171); }
+/* 其他：灰调 */
+.act-img[data-cat="other"] { background: linear-gradient(135deg, #d6dbe0, #94a3b8); }
+
+/* ---------- 骨架屏（加载中占位） ---------- */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--ink-100);
+  border-radius: var(--r-md);
+}
+.skeleton::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.6), transparent);
+  transform: translateX(-100%);
+  animation: skeleton-shine 1.4s infinite;
+}
+@keyframes skeleton-shine { to { transform: translateX(100%); } }
+
+/* ---------- 数字滚动 ---------- */
+.cs-item b, .ms-item b {
+  display: inline-block;
+  transition: none;
+}
+
+/* ---------- 顶部导航滚动阴影（桌面/平板） ---------- */
+@media (min-width: 640px) {
+  .tabbar.scrolled { box-shadow: 0 4px 20px rgba(26,29,28,.08); }
+}
+
+/* ---------- 卡片悬浮（桌面端） ---------- */
+@media (min-width: 640px) and (hover: hover) {
+  .act-card, .team-card, .guide-card, .checkin-card {
+    transition: transform .25s var(--ease-spring), box-shadow .25s var(--ease-smooth);
+  }
+  .act-card:hover, .team-card:hover, .guide-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-3);
+  }
+}
+
+/* ---------- 返回顶部按钮 ---------- */
+.back-top {
+  position: fixed;
+  right: 24px;
+  bottom: 88px;
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: var(--shadow-2);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--mint-600);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(12px);
+  transition: all .3s var(--ease-out);
+  z-index: 90;
+}
+.back-top.show { opacity: 1; pointer-events: auto; transform: translateY(0); }
+.back-top svg { width: 20px; height: 20px; transform: rotate(-90deg); }
+@media (min-width: 640px) {
+  .back-top { right: 32px; bottom: 32px; }
+}
+
+/* 攻略封面：按 data-cover 轮换渐变 */
+.g-cover[data-cover="0"] { background: linear-gradient(135deg, #d9c8ff, #a78bfa); }
+.g-cover[data-cover="1"] { background: linear-gradient(135deg, #b7ecd3, #34d399); }
+.g-cover[data-cover="2"] { background: linear-gradient(135deg, #ffc8dd, #f472b6); }
+.g-cover[data-cover="3"] { background: linear-gradient(135deg, #ffe3b3, #fbbf24); }
+.g-cover[data-cover="4"] { background: linear-gradient(135deg, #bfe3ff, #60a5fa); }
