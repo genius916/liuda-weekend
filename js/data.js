@@ -614,6 +614,41 @@ const DEMO_ACTIVITIES = [
     reason: '经典入门古道 15km，走完住一晚再回',
     img: uimg('1506905925346-21bda4d32df4'), rating: 4.6, likes: 231, date: '周六 08:00',
   },
+
+  /* ---- 城市线补量：展览 / 市集 / 演出 / 美食 ----
+     分类标签是手动浏览入口，每类都得有货，所以这几类各补 1-2 条 */
+  {
+    id: 'c1', title: '杭帮菜 · 老字号三人食', category: 'food',
+    location: '上城区 河坊街', distance: 4, cost: 90,
+    weatherFit: ['sunny', 'cloudy', 'rain'], crowd: '高',
+    tags: ['美食', '本地菜', '人均低'],
+    reason: '西湖醋鱼加龙井虾仁，人均 90 吃到撑，雨天照样去',
+    img: uimg('1528605248644-14dd04022da1'), rating: 4.6, likes: 726, date: '本周末',
+  },
+  {
+    id: 'c2', title: '深夜食堂 · 夜市小吃街', category: 'food',
+    location: '拱墅区 胜利河', distance: 6, cost: 50,
+    weatherFit: ['sunny', 'cloudy'], crowd: '高',
+    tags: ['美食', '夜市', '人均低'],
+    reason: '50 元横扫一条街，晚上 10 点最热闹',
+    img: uimg('1501339847302-ac426a4a7cbb'), rating: 4.5, likes: 583, date: '周六 21:00',
+  },
+  {
+    id: 'c3', title: '周末农夫市集 · 本地鲜货', category: 'market',
+    location: '西湖区 转塘', distance: 14, cost: 30,
+    weatherFit: ['sunny', 'cloudy'], crowd: '中',
+    tags: ['市集', '新鲜', '手作'],
+    reason: '本地农户直供，30 元能拎一袋当季水果回宿舍',
+    img: uimg('1543168256-418811576931'), rating: 4.5, likes: 214, date: '周六 09:00',
+  },
+  {
+    id: 'c4', title: '小剧场话剧《迷路的人》', category: 'show',
+    location: '西湖文化广场', distance: 5, cost: 80,
+    weatherFit: ['sunny', 'cloudy', 'rain'], crowd: '低',
+    tags: ['演出', '话剧', '学生票'],
+    reason: '80 元的学生票价，120 座小剧场离演员最近',
+    img: uimg('1489599849927-2ee91cede3ba'), rating: 4.7, likes: 187, date: '周六 19:30',
+  },
 ];
 
 /* ---------- 演示组队 ---------- */

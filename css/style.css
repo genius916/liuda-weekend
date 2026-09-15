@@ -453,6 +453,10 @@ img { display: block; max-width: 100%; }
   -webkit-overflow-scrolling: touch;
 }
 .cat-scroll::-webkit-scrollbar { display: none; }
+/* 分类变多后，桌面端改成换行铺开：横向滚动条被隐藏，用鼠标滚轮够不到后面的标签 */
+@media (min-width: 720px) {
+  .cat-scroll { flex-wrap: wrap; overflow-x: visible; row-gap: 8px; }
+}
 
 /* ============ 活动卡片 ============ */
 .list { padding: 0 20px; display: flex; flex-direction: column; gap: 14px; }

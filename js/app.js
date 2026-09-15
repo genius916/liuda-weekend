@@ -184,8 +184,9 @@ function renderHome() {
     openCultureSheet();
   });
 
-  // 天气按钮
+  // 天气按钮（顶栏图标跟随当前天气，点击同样打开详情）
   $('#btn-weather').innerHTML = icon(w.icon);
+  $('#btn-weather').title = `${cityLabel} · ${w.name}${tempStr ? ' ' + tempStr : ''}，点击看今日天气`;
 
   // 本次随机结果：只有真的摇出结果才渲染（不再有「今天去哪儿」这种需要再点一次的中间页）
   if (state.onboarded && deciderResult) renderDecider();
@@ -206,13 +207,18 @@ function renderHome() {
     // 标题复位：回到推荐列表上方
     placeRecoHead('top');
 
-    // 分类筛选：只列本轮勾选过的玩法，避免筛出与偏好无关的内容
+    // 分类筛选：全部 + 所有真正有内容的分类（本轮勾选的排在前面，方便一眼看到自己在意的）
     const cats = sessionCats();
-    const catKeys = cats.length ? cats : PICKABLE_CATS;
-    if (state.filterPrefs.cat !== 'all' && !catKeys.includes(state.filterPrefs.cat)) {
+    const hasData = k => state.activities.some(a => a.category === k)
+      || (state.aiRecommended || []).some(a => a.category === k);
+    const chipKeys = [
+      ...cats.filter(hasData),
+      ...PICKABLE_CATS.filter(k => !cats.includes(k) && hasData(k)),
+    ];
+    if (state.filterPrefs.cat !== 'all' && !chipKeys.includes(state.filterPrefs.cat)) {
       state.filterPrefs.cat = 'all';
     }
-    const chipDefs = [['all', '全部'], ...catKeys.map(k => [k, CATEGORIES[k].name])];
+    const chipDefs = [['all', '全部'], ...chipKeys.map(k => [k, CATEGORIES[k].name])];
     $('#home-cats').innerHTML = chipDefs.map(([k, name]) =>
       `<button class="chip ${state.filterPrefs.cat === k ? 'on' : ''}" data-cat="${k}">${name}</button>`
     ).join('');
@@ -221,32 +227,49 @@ function renderHome() {
       renderHome();
     }));
 
-    // 推荐列表：优先 AI 结果，否则本地推荐；都严格限定在本轮勾选的类型内
-    let base = state.aiRecommended.length
-      ? state.aiRecommended.filter(inSessionCats)
-      : recommend().filter(inSessionCats);
-    // 顶部随机结果已经在展示的那个，不再在列表里重复出现
-    let list = base.filter(a => !deciderResult || a.id !== deciderResult.id);
-    if (state.filterPrefs.cat !== 'all') {
-      list = list.filter(a => a.category === state.filterPrefs.cat);
+    // 列表分两种口径：
+    // 「全部」= 本轮按勾选类型生成的结果；点具体分类 = 该分类的全部候选（不受勾选限制，
+    // 点哪个标签就给哪个分类的活动，保证每个标签都有内容）
+    const activeCat = state.filterPrefs.cat;
+    let list;
+    if (activeCat === 'all') {
+      let base = state.aiRecommended.length
+        ? state.aiRecommended.filter(inSessionCats)
+        : recommend().filter(inSessionCats);
+      list = base.filter(a => !deciderResult || a.id !== deciderResult.id);
+    } else {
+      list = categoryPool(activeCat).filter(a => !(deciderResult && deciderResult.id === a.id));
     }
 
-    const catLabel = catKeys.map(k => CATEGORIES[k].name).join(' · ');
-    if (state.aiRecommended.length) {
-      $('#home-reco-title').textContent = 'AI 为你选好了';
-      $('#home-reco-sub').textContent = `${catLabel} · 另有 ${list.length} 个备选`;
+    if (activeCat === 'all') {
+      const catLabel = (cats.length ? cats : chipKeys).map(k => CATEGORIES[k].name).join(' · ');
+      if (state.aiRecommended.length) {
+        $('#home-reco-title').textContent = 'AI 为你选好了';
+        $('#home-reco-sub').textContent = `${catLabel} · 另有 ${list.length} 个备选`;
+      } else {
+        $('#home-reco-title').textContent = '同类备选';
+        $('#home-reco-sub').textContent = `${catLabel} · 共 ${list.length} 个`;
+      }
     } else {
-      $('#home-reco-title').textContent = '同类备选';
-      $('#home-reco-sub').textContent = `${catLabel} · 共 ${list.length} 个`;
+      $('#home-reco-title').textContent = `${CATEGORIES[activeCat].name}推荐`;
+      $('#home-reco-sub').textContent = `共 ${list.length} 个`;
     }
 
     if (list.length === 0) {
-      $('#home-list').innerHTML = `<div class="empty">${icon('compass')}<p>这个玩法暂时没有更多目的地了<br>换个玩法或放宽预算试试</p></div>`;
+      $('#home-list').innerHTML = `<div class="empty">${icon('compass')}<p>这个分类暂时没有更多目的地了<br>换个分类或放宽预算试试</p></div>`;
     } else {
       $('#home-list').innerHTML = list.map((a, i) => activityCard(a, i)).join('');
       bindActivityCards();
     }
   }
+}
+
+/* 某个分类的候选池：AI 结果 + 本地数据（手动点分类标签时用，不受勾选类型限制） */
+function categoryPool(cat) {
+  const ai = (state.aiRecommended || []).filter(a => !cat || a.category === cat);
+  const local = state.activities.filter(a => !cat || a.category === cat);
+  const seen = new Set(ai.map(a => a.title));
+  return [...ai, ...local.filter(a => !seen.has(a.title))];
 }
 
 /* 本轮勾选的玩法类型 */
@@ -1519,6 +1542,9 @@ function init() {
 
   // 通知按钮（演示）
   $('#btn-notice').addEventListener('click', () => toast('暂无新通知'));
+
+  // 顶栏天气按钮：打开今日天气详情（此前漏绑事件，点上去没反应）
+  $('#btn-weather').addEventListener('click', openWeatherSheet);
 
   // 组队筛选按钮（演示）
   $('#btn-team-filter').addEventListener('click', () => toast('筛选：全部类型'));
