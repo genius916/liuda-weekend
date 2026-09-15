@@ -105,6 +105,10 @@ function renderHome() {
     renderOnboarding();
     renderDefaultHotList();
   } else {
+    // 进入推荐态：清理初始态的默认热门区块
+    const hotOld = $('#home-hot');
+    if (hotOld) hotOld.remove();
+
     // 分类筛选
     const cats = [['all', '全部'], ...Object.entries(CATEGORIES).map(([k, v]) => [k, v.name])];
     $('#home-cats').innerHTML = cats.map(([k, name]) =>
