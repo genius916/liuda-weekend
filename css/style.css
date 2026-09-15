@@ -818,7 +818,18 @@ img { display: block; max-width: 100%; }
   /* 内容区顶到导航下方（固定顶部导航 64px） */
   .app { padding-top: 64px; padding-bottom: 0; }
   .page { padding-top: 0; }
-  .topbar { padding-top: 24px; max-width: 1200px; margin-left: auto; margin-right: auto; top: 64px; }
+  /* 桌面端页头回归正常流，避免 sticky 与下方内容重叠裁切 */
+  .topbar {
+    position: static;
+    top: auto;
+    padding: 22px 20px 6px;
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+    background: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 
   /* 内容容器加宽 */
   .wrap, .list, .section-head, .cat-scroll, .hero,
