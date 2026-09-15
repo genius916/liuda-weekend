@@ -189,10 +189,14 @@ function renderHome() {
     $('#home-reco-sub').textContent = '先看看这些热门好去处';
     renderOnboarding();
     renderDefaultHotList();
+    // 标题下移：放到「三个问题」下方，直接领起本地热门推荐
+    placeRecoHead('below');
   } else {
     // 进入推荐态：清理初始态的默认热门区块
     const hotOld = $('#home-hot');
     if (hotOld) hotOld.remove();
+    // 标题复位：回到推荐列表上方
+    placeRecoHead('top');
 
     // 分类筛选
     const cats = [['all', '全部'], ...Object.entries(CATEGORIES).map(([k, v]) => [k, v.name])];
@@ -231,6 +235,18 @@ function renderHome() {
   }
 }
 
+/* 推荐区标题定位
+   'below' —— 引导态：标题排在「三个问题」卡片下方，直接领起本地热门推荐
+   'top'   —— 推荐态：标题回到推荐列表上方 */
+function placeRecoHead(mode) {
+  const head = $('#home-reco-head');
+  const list = $('#home-list');
+  const hot = $('#home-hot');
+  if (!head || !list) return;
+  if (mode === 'below' && hot) hot.before(head);
+  else list.before(head);
+}
+
 /* 默认热门推荐（未引导时也展示一批本地热点，避免页面单一） */
 function renderDefaultHotList() {
   // 用评分+热度排序取前 4 个作为「热门推荐」
@@ -239,14 +255,11 @@ function renderDefaultHotList() {
     .sort((x, y) => y.hot - x.hot)
     .slice(0, 4);
   // 追加一个「本地热门」区块到 home-list 末尾（引导卡片下方）
+  // 注意：区块内不再自带小标题，标题由 #home-reco-head 下移后统一领起
   const block = document.createElement('div');
   block.className = 'hot-block';
   block.id = 'home-hot';
   block.innerHTML = `
-    <div class="section-head hot-head">
-      <h2>${CITY.name}本地热门</h2>
-      <span class="more">大家都在去</span>
-    </div>
     <div class="list hot-list">
       ${hot.map((a, i) => activityCard(a, i)).join('')}
     </div>

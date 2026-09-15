@@ -57,7 +57,13 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { -webkit-text-size-adjust: 100%; }
+html {
+  -webkit-text-size-adjust: 100%;
+  /* 阻止移动端下拉刷新 / 橡皮筋回弹。
+     ⚠️ 必须放在根元素 html 上：这里只作用于视口本身，不会切断滚动链。
+     若写在 body 上，一旦 body 因 overflow 变成滚动容器，滚轮就会在 body 层被吃掉。 */
+  overscroll-behavior-y: none;
+}
 
 body {
   font-family: var(--font-body);
@@ -66,7 +72,6 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overscroll-behavior-y: none;
 }
 
 h1, h2, h3, h4 { font-family: var(--font-display); letter-spacing: -0.01em; }
@@ -1273,9 +1278,20 @@ img { display: block; max-width: 100%; }
 
 /* ============================================================
    横向溢出修复（窄屏 grid min-content 撑开容器）
+   ------------------------------------------------------------
+   ⚠️ 这里绝对不能用 overflow-x: hidden 写在 html/body 上。
+   原因：html 一旦有非 visible 的 overflow，body 的 overflow 就不再
+   上缴给视口，body 会变成真正的滚动容器；此时 body 的
+   overscroll-behavior-y:none 会切断"滚到头向上传递"的滚动链，
+   导致鼠标滚轮彻底失效（只能拖右侧滚动条）。
+   overflow-x: clip 不创建滚动容器，既能裁掉横向溢出，
+   也完全不影响滚轮滚动。
    ============================================================ */
-html, body { overflow-x: hidden; }
-.app { overflow-x: hidden; }
+.app { overflow-x: clip; }
+@supports not (overflow: clip) {
+  /* 老浏览器回退：只放在 .app 上，它没有 overscroll-behavior 限制，滚动链正常 */
+  .app { overflow-x: hidden; }
+}
 
 /* grid 子项允许收缩 */
 .hero-weather, .hero-budget, .ob-opt, .ob-card,
@@ -1356,8 +1372,8 @@ html, body { overflow-x: hidden; }
 .ai-loading span { font-size: 12.5px; color: var(--ink-400); }
 
 /* ---------- 默认热门推荐区块 ---------- */
-.hot-block { margin-top: 8px; }
-.hot-head { margin-top: 4px; }
+/* 本地热门区块：标题由 #home-reco-head 下移后统一领起，区块内不再重复小标题 */
+.hot-block { margin-top: 0; }
 .hot-list { padding-bottom: 8px; }
 
 /* 深色模式：AI 加载态文字 */
