@@ -1259,3 +1259,32 @@ img { display: block; max-width: 100%; }
   .ob-card { padding: 36px 32px; }
   .ob-title { font-size: 24px; }
 }
+
+/* ============================================================
+   横向溢出修复（窄屏 grid min-content 撑开容器）
+   ============================================================ */
+html, body { overflow-x: hidden; }
+.app { overflow-x: hidden; }
+
+/* grid 子项允许收缩 */
+.hero-weather, .hero-budget, .ob-opt, .ob-card,
+.act-card, .team-card, .guide-card, .checkin-card {
+  min-width: 0;
+}
+.hero-temp, .hero-sub, .ob-title, .ob-sub {
+  overflow-wrap: anywhere;
+}
+.hero { grid-template-columns: 1fr 1fr; }
+@media (max-width: 400px) {
+  .hero { gap: 10px; }
+  .hero-temp { font-size: 13px; }
+  .hero-sub { font-size: 11px; }
+}
+
+/* grid 隐式 min-content 溢出根治：显式 minmax(0,1fr) */
+.hero { grid-template-columns: minmax(0,1fr) minmax(0,1fr); }
+.ob-options, .ob-cols-3 { grid-template-columns: repeat(3, minmax(0,1fr)); }
+.checkin-stats { grid-template-columns: repeat(3, minmax(0,1fr)); }
+.me-stats { grid-template-columns: repeat(4, minmax(0,1fr)); }
+.interest-grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
+.photo-grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
