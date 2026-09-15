@@ -70,7 +70,10 @@ const COMPANIONS = {
 
 /* ---------- StepFun AI 推荐接口 ---------- */
 const STEPFUN_CONFIG = {
-  endpoint: 'https://api.stepfun.com/v1/chat/completions',
+  // 直连 StepFun（会被浏览器 CORS 拦截，仅作备用说明）
+  direct: 'https://api.stepfun.com/v1/chat/completions',
+  // Cloudflare Pages Function 代理（国内可达，解决 CORS 冲突，服务端持有 key）
+  proxy: 'https://liuda-ai-proxy.pages.dev/api/chat',
   apiKey: '3y4thYb47q3bm2ztLTUk1eZvp1IRRx16c8xsSWY8CgQXp0AllDHolFsUwxRlhYj1R',
   model: 'step-3.7-flash',
 };
@@ -112,11 +115,10 @@ async function fetchAIRecommendations(prefs) {
 
 请推荐 5 个最适合该用户的真实周末目的地，覆盖不同风格，每个目的地都要符合上述偏好约束。`;
 
-    const res = await fetch(STEPFUN_CONFIG.endpoint, {
+    const res = await fetch(STEPFUN_CONFIG.proxy, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + STEPFUN_CONFIG.apiKey,
       },
       body: JSON.stringify({
         model: STEPFUN_CONFIG.model,
