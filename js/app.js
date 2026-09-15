@@ -239,6 +239,8 @@ function renderHome() {
       list = base.filter(a => !deciderResult || a.id !== deciderResult.id);
     } else {
       list = categoryPool(activeCat).filter(a => !(deciderResult && deciderResult.id === a.id));
+      // 手动点的分类就算没在三个问题里勾过，也要给足推荐：本地不够就现拉一批 AI 的
+      ensureCategoryResults(activeCat);
     }
 
     if (activeCat === 'all') {
@@ -252,16 +254,53 @@ function renderHome() {
       }
     } else {
       $('#home-reco-title').textContent = `${CATEGORIES[activeCat].name}推荐`;
-      $('#home-reco-sub').textContent = `共 ${list.length} 个`;
+      $('#home-reco-sub').textContent = catFetching === activeCat
+        ? '正在拉取更多…'
+        : `共 ${list.length} 个`;
     }
 
     if (list.length === 0) {
-      $('#home-list').innerHTML = `<div class="empty">${icon('compass')}<p>这个分类暂时没有更多目的地了<br>换个分类或放宽预算试试</p></div>`;
+      $('#home-list').innerHTML = catFetching === activeCat
+        ? `<div class="ai-loading"><div class="ai-spinner"></div><p>正在为你拉取「${CATEGORIES[activeCat].name}」推荐…</p></div>`
+        : `<div class="empty">${icon('compass')}<p>这个分类暂时没有更多目的地了<br>换个分类或放宽预算试试</p></div>`;
     } else {
       $('#home-list').innerHTML = list.map((a, i) => activityCard(a, i)).join('');
+      // 正在补拉的分类：列表尾部给一条轻量提示，别让用户以为就这么几张
+      if (catFetching === activeCat) {
+        $('#home-list').insertAdjacentHTML('beforeend',
+          `<div class="cat-loading" id="cat-loading"><div class="ai-spinner"></div><p>正在拉取更多「${CATEGORIES[activeCat].name}」推荐…</p></div>`);
+      }
       bindActivityCards();
     }
   }
+}
+
+/* 手动点分类标签时的补量逻辑：
+   本地数据 + 已有 AI 结果不足 3 条，就为这个分类单独向 AI 要一批（每个分类每轮只补一次） */
+let catFetching = null;
+const catFetched = new Set();
+
+async function ensureCategoryResults(cat) {
+  if (!cat || cat === 'all' || !CATEGORIES[cat]) return;
+  if (catFetching || catFetched.has(cat)) return;
+  const aiCount = (state.aiRecommended || []).filter(a => a.category === cat).length;
+  if (aiCount >= 3) return;
+
+  catFetching = cat;
+  if (currentPage === 'home' && state.filterPrefs.cat === cat) renderHome();
+
+  const more = await fetchAIRecommendations({ ...buildPrefs(), interests: [cat] });
+  catFetching = null;
+  catFetched.add(cat);
+
+  const add = (more || []).filter(a =>
+    a.category === cat && !state.aiRecommended.some(x => x.title === a.title)
+  );
+  if (add.length) state.aiRecommended = [...state.aiRecommended, ...add];
+  else toast(`「${CATEGORIES[cat].name}」暂时没有更多推荐，先看看这些`);
+
+  // 用户可能已经切到别的分类，只有还停在这个分类时才重绘
+  if (currentPage === 'home' && state.filterPrefs.cat === cat) renderHome();
 }
 
 /* 某个分类的候选池：AI 结果 + 本地数据（手动点分类标签时用，不受勾选类型限制） */
@@ -595,6 +634,8 @@ function startOver() {
   obStep = 0;
   deciderResult = null;
   deciderSeen.clear();
+  catFetching = null;
+  catFetched.clear();
   state.onboarded = false;
   state.aiRecommended = [];
   state.sessionCats = [];

@@ -458,6 +458,19 @@ img { display: block; max-width: 100%; }
   .cat-scroll { flex-wrap: wrap; overflow-x: visible; row-gap: 8px; }
 }
 
+/* 分类补量时的尾部轻提示（不抢主内容的视觉） */
+.cat-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px 0 6px;
+  color: var(--ink-400);
+  font-size: 13px;
+}
+.cat-loading .ai-spinner { width: 16px; height: 16px; border-width: 2px; }
+.cat-loading p { margin: 0; }
+
 /* ============ 活动卡片 ============ */
 .list { padding: 0 20px; display: flex; flex-direction: column; gap: 14px; }
 .act-card {

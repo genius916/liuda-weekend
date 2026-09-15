@@ -25,6 +25,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Pages
         uses: actions/configure-pages@v4
+      - name: 注入资源版本号（防止浏览器与 Pages 缓存旧 JS/CSS）
+        run: sed -i -E "s/\?v=[A-Za-z0-9._-]+/?v=${GITHUB_SHA::8}/g" index.html
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
