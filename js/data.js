@@ -33,8 +33,31 @@ const WMO_TO_WEATHER = {
   85: 'rain', 86: 'rain', 95: 'rain', 96: 'rain', 99: 'rain', // 雪/雷暴
 };
 
-/* 城市坐标（杭州） */
-const CITY = { name: '杭州', lat: 30.2741, lng: 120.1551 };
+/* 城市坐标（默认杭州，运行时按 IP 定位自动更新） */
+const DEFAULT_CITY = { name: '杭州', lat: 30.2741, lng: 120.1551 };
+let CITY = { ...DEFAULT_CITY };
+
+/**
+ * IP 定位获取用户所在城市（ipinfo.io，免费、无需 key、支持 CORS）
+ * 失败返回 null，由调用方走默认城市兜底
+ */
+async function fetchLocation() {
+  try {
+    const res = await fetch('https://ipinfo.io/json');
+    if (!res.ok) return null;
+    const d = await res.json();
+    if (!d || !d.loc) return null;
+    const [lat, lng] = String(d.loc).split(',').map(Number);
+    if (!isFinite(lat) || !isFinite(lng)) return null;
+    return {
+      name: d.city || d.region || DEFAULT_CITY.name,
+      region: d.region || '',
+      lat, lng,
+    };
+  } catch (e) {
+    return null;
+  }
+}
 
 /* ---------- 交通方式 ---------- */
 const TRANSPORTS = [
@@ -178,20 +201,48 @@ async function fetchAIRecommendations(prefs) {
   }
 }
 
-/* 获取真实天气（Open-Meteo，失败返回 null 走降级） */
-async function fetchRealWeather() {
+/* 获取真实天气（Open-Meteo，免费无需 key；失败返回 null 走降级） */
+async function fetchRealWeather(lat, lng) {
+  const la = lat ?? CITY.lat;
+  const ln = lng ?? CITY.lng;
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${CITY.lat}&longitude=${CITY.lng}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Asia%2FShanghai&forecast_days=1`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${la}&longitude=${ln}`
+      + `&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,precipitation_probability`
+      + `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max`
+      + `&timezone=auto&forecast_days=3`;
     const res = await fetch(url);
     if (!res.ok) return null;
     const data = await res.json();
     const code = data.current?.weather_code ?? data.daily?.weather_code?.[0];
     const temp = data.current?.temperature_2m ?? data.daily?.temperature_2m_max?.[0];
     if (code === undefined) return null;
+
+    // 未来 3 天预报
+    const daily = [];
+    const dt = data.daily || {};
+    const days = ['今天', '明天', '后天'];
+    if (Array.isArray(dt.time)) {
+      for (let i = 0; i < Math.min(3, dt.time.length); i++) {
+        daily.push({
+          label: days[i] || dt.time[i],
+          type: WMO_TO_WEATHER[dt.weather_code?.[i]] || 'cloudy',
+          max: Math.round(dt.temperature_2m_max?.[i] ?? 0),
+          min: Math.round(dt.temperature_2m_min?.[i] ?? 0),
+          rain: Math.round(dt.precipitation_probability_max?.[i] ?? 0),
+        });
+      }
+    }
+
     return {
       type: WMO_TO_WEATHER[code] || 'cloudy',
       temp: Math.round(temp),
+      feels: data.current?.apparent_temperature != null ? Math.round(data.current.apparent_temperature) : null,
+      humidity: data.current?.relative_humidity_2m ?? null,
+      wind: data.current?.wind_speed_10m != null ? Math.round(data.current.wind_speed_10m) : null,
+      rainProb: data.current?.precipitation_probability ?? dt.precipitation_probability_max?.[0] ?? null,
       code,
+      daily,
+      updatedAt: new Date(),
     };
   } catch (e) {
     return null;

@@ -62,25 +62,31 @@ function closeSheet() {
 }
 
 /* ---------- 首页 ---------- */
-let realWeather = null; // 真实天气缓存（null 表示未获取或失败）
+let realWeather = null;      // 真实天气缓存（null 表示未获取或失败）
+let locating = false;        // 是否正在定位
 
 function renderHome() {
   const w = getWeather(state.weather);
   const tempStr = realWeather ? `${realWeather.temp}°` : '';
+  const cityLabel = CITY.name + (CITY.region && CITY.region !== CITY.name ? '·' + CITY.region : '');
 
-  // 天气 + 预算 hero
+  // 天气 + 预算 hero（天气为自动获取，不可手动切换）
   $('#home-hero').innerHTML = `
     <div class="hero-weather" id="weather-toggle">
       <div class="hero-icon">${icon(w.icon)}</div>
-      <div>
-        <div class="hero-temp">${w.emoji} ${w.name}${tempStr ? ' · ' + tempStr : ''} · ${w.desc}</div>
-        <div class="hero-sub">${CITY.name} · ${realWeather ? '实时天气' : '今天适合这样玩'}</div>
+      <div class="hero-info">
+        <div class="hero-temp">${w.emoji} ${w.name}${tempStr ? ' · ' + tempStr : ''}${realWeather ? ' · ' + w.desc : ''}</div>
+        <div class="hero-sub">${
+          locating ? '正在定位你所在的城市…'
+          : realWeather ? `${cityLabel} · 实时天气 · 点击看详情`
+          : `${cityLabel} · 点击查看今日天气`
+        }</div>
       </div>
       <button class="hero-arrow">${icon('arrowRight')}</button>
     </div>
     <div class="hero-budget" id="budget-toggle">
       <div class="hero-icon">${icon('wallet')}</div>
-      <div>
+      <div class="hero-info">
         <div class="hero-temp">预算 <b>${fmtCost(state.filterPrefs.budget)}</b> 以内</div>
         <div class="hero-sub">点击调整预算</div>
       </div>
@@ -622,48 +628,105 @@ function toggleFavActivity(id) {
   renderHome();
 }
 
-/* 天气选择弹层 */
+/* 天气详情弹层（天气为自动获取的真实数据，不可手动选择） */
 function openWeatherSheet() {
+  const w = getWeather(state.weather);
+  const rw = realWeather;
+  const cityLabel = CITY.name + (CITY.region && CITY.region !== CITY.name ? ' · ' + CITY.region : '');
+
+  const metrics = rw ? `
+    <div class="weather-grid">
+      ${rw.feels != null ? `<div class="wg-item"><b>${rw.feels}°</b><span>体感温度</span></div>` : ''}
+      ${rw.humidity != null ? `<div class="wg-item"><b>${rw.humidity}%</b><span>相对湿度</span></div>` : ''}
+      ${rw.wind != null ? `<div class="wg-item"><b>${rw.wind}</b><span>风速 km/h</span></div>` : ''}
+      ${rw.rainProb != null ? `<div class="wg-item"><b>${rw.rainProb}%</b><span>降水概率</span></div>` : ''}
+    </div>` : '';
+
+  const forecast = (rw && rw.daily && rw.daily.length) ? `
+    <div class="weather-forecast">
+      ${rw.daily.map(d => {
+        const dw = getWeather(d.type);
+        return `<div class="wf-item">
+          <span class="wf-day">${d.label}</span>
+          <span class="wf-icon">${dw.emoji}</span>
+          <span class="wf-temp">${d.min}° / ${d.max}°</span>
+          <span class="wf-rain">${d.rain}%</span>
+        </div>`;
+      }).join('')}
+    </div>` : '';
+
   openSheet(`
-    <h3>今日天气</h3>
-    <div class="weather-options">
-      ${Object.entries(WEATHERS).map(([k, w]) => `
-        <button class="weather-opt ${state.weather === k ? 'on' : ''}" data-w="${k}">
-          <span class="w-emoji">${w.emoji}</span>
-          <span class="w-name">${w.name}</span>
-          <span class="w-desc">${w.desc}</span>
-        </button>`).join('')}
+    <h3>${cityLabel} 天气</h3>
+    <div class="weather-now">
+      <div class="wn-icon">${icon(w.icon, '#10b981')}</div>
+      <div class="wn-main">
+        <b>${rw ? rw.temp + '°' : '--'}</b>
+        <span>${w.emoji} ${w.name} · ${w.desc}</span>
+      </div>
     </div>
+    ${metrics}
+    ${forecast}
+    <p class="weather-note">
+      天气按你所在位置自动获取（数据来源 Open-Meteo）。推荐结果已据此自动匹配：
+      ${state.weather === 'rain' ? '优先推荐室内活动' : state.weather === 'sunny' ? '优先推荐户外活动' : '室内外都可'}。
+    </p>
+    <button class="btn btn-ghost" style="width:100%" id="weather-refresh">重新定位并刷新天气</button>
   `);
-  $$('.weather-opt').forEach(b => b.addEventListener('click', () => {
-    state.weather = b.dataset.w;
-    state.filterPrefs.weather = b.dataset.w;
-    saveState();
+
+  $('#weather-refresh').addEventListener('click', async () => {
     closeSheet();
+    toast('正在重新定位…');
+    await initLocationAndWeather();
     renderHome();
-    toast('已切换天气：' + getWeather(b.dataset.w).name);
-  }));
+  });
 }
 
-/* 预算选择弹层 */
+/* 定位 + 获取天气（启动时与手动刷新都走这里） */
+async function initLocationAndWeather() {
+  locating = true;
+  if (currentPage === 'home') renderHome();
+
+  const loc = await fetchLocation();
+  if (loc) {
+    CITY = { name: loc.name, region: loc.region, lat: loc.lat, lng: loc.lng };
+  }
+
+  const rw = await fetchRealWeather(CITY.lat, CITY.lng);
+  locating = false;
+
+  if (rw) {
+    realWeather = rw;
+    state.weather = rw.type;
+    state.filterPrefs.weather = rw.type;
+    saveState();
+  } else if (loc) {
+    // 定位成功但天气失败，至少更新城市名
+    saveState();
+  }
+  return { loc, rw };
+}
+
+/* 预算选择弹层（档位与引导流保持一致：100 元起，去掉几十元档） */
 function openBudgetSheet() {
-  const opts = [30, 50, 100, 200, 500];
   openSheet(`
     <h3>预算范围</h3>
+    <p style="font-size:13px;color:var(--ink-400);margin-bottom:14px">按人均计算</p>
     <div class="budget-options">
-      ${opts.map(v => `
-        <button class="budget-opt ${state.filterPrefs.budget === v ? 'on' : ''}" data-b="${v}">
-          ${v === 500 ? '不限' : '≤ ' + fmtCost(v)}
+      ${BUDGETS.map(b => `
+        <button class="budget-opt ${state.filterPrefs.budget === b.value ? 'on' : ''}" data-b="${b.value}">
+          <b>${b.label}</b>
+          <span>${b.desc}</span>
         </button>`).join('')}
     </div>
   `);
   $$('.budget-opt').forEach(b => b.addEventListener('click', () => {
-    state.filterPrefs.budget = parseInt(b.dataset.b);
-    state.user.budget = parseInt(b.dataset.b);
+    const v = parseInt(b.dataset.b);
+    state.filterPrefs.budget = v;
+    state.user.budget = v;
     saveState();
     closeSheet();
     renderHome();
-    toast('预算已设为 ' + (b.dataset.b === '500' ? '不限' : '≤ ' + fmtCost(parseInt(b.dataset.b))));
+    toast('预算已设为 ' + (v >= 999999 ? '不限' : '≤ ' + fmtCost(v)));
   }));
 }
 
@@ -1261,18 +1324,9 @@ function init() {
   // 初次渲染
   renderHome();
 
-  // 异步获取真实天气（Open-Meteo，免费无需 key）
-  fetchRealWeather().then(rw => {
-    if (rw && rw.type !== state.weather) {
-      realWeather = rw;
-      state.weather = rw.type;
-      state.filterPrefs.weather = rw.type;
-      saveState();
-      if (currentPage === 'home') renderHome();
-    } else if (rw) {
-      realWeather = rw;
-      if (currentPage === 'home') renderHome();
-    }
+  // 异步：IP 定位 → 拉取当地实时天气（免费，无需 key）
+  initLocationAndWeather().then(() => {
+    if (currentPage === 'home') renderHome();
   });
 }
 
