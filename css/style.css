@@ -779,6 +779,19 @@ img { display: block; max-width: 100%; }
     justify-content: center;
     gap: 4px;
   }
+  /* 顶部导航左侧注入品牌 */
+  .tabbar::before {
+    content: '溜达';
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 20px;
+    color: var(--ink-900);
+    margin-right: 24px;
+    padding-left: 20px;
+  }
+  /* 桌面端隐藏各页面的品牌标题栏（导航已含品牌） */
+  .topbar .brand { display: none; }
+  .topbar { justify-content: flex-end; }
   .tab-item {
     flex-direction: row;
     gap: 6px;
@@ -802,9 +815,10 @@ img { display: block; max-width: 100%; }
   .tab-publish .publish-btn::after { content: '发布'; font-size: 14px; font-weight: 600; }
   .tab-publish > span:last-child { display: none; }
 
-  /* 内容区顶到导航下方 */
+  /* 内容区顶到导航下方（固定顶部导航 64px） */
+  .app { padding-top: 64px; padding-bottom: 0; }
   .page { padding-top: 0; }
-  .topbar { padding-top: 24px; max-width: 1200px; margin-left: auto; margin-right: auto; }
+  .topbar { padding-top: 24px; max-width: 1200px; margin-left: auto; margin-right: auto; top: 64px; }
 
   /* 内容容器加宽 */
   .wrap, .list, .section-head, .cat-scroll, .hero,
