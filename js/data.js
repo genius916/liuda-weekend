@@ -7,13 +7,27 @@ const STORE_KEY = 'liuda_store_v1';
 
 /* ---------- 活动分类 ---------- */
 const CATEGORIES = {
-  exhibition: { name: '展览', color: '#8b5cf6', bg: '#f3efff', icon: 'exhibition' },
-  market:     { name: '市集', color: '#f59e0b', bg: '#fff5e6', icon: 'market' },
-  show:       { name: '演出', color: '#ec4899', bg: '#ffeef6', icon: 'show' },
-  hike:       { name: '徒步', color: '#10b981', bg: '#e8f9f1', icon: 'hike' },
-  food:       { name: '美食', color: '#ef4444', bg: '#ffecec', icon: 'food' },
-  other:      { name: '其他', color: '#64748b', bg: '#f0f2f5', icon: 'other' },
+  // 户外撒野（引导第 1 步优先呈现，户外选项尽量多）
+  hike:       { name: '徒步', color: '#10b981', bg: '#e8f9f1', icon: 'hike',     group: 'outdoor' },
+  mountain:   { name: '登山', color: '#0ea5e9', bg: '#e6f5fe', icon: 'mountain', group: 'outdoor' },
+  rafting:    { name: '漂流', color: '#06b6d4', bg: '#e3f8fb', icon: 'rafting',  group: 'outdoor' },
+  camp:       { name: '露营', color: '#65a30d', bg: '#f2fbe2', icon: 'camp',     group: 'outdoor' },
+  bike:       { name: '骑行', color: '#14b8a6', bg: '#e4f8f6', icon: 'bike',     group: 'outdoor' },
+  pick:       { name: '采摘', color: '#f97316', bg: '#fff1e5', icon: 'pick',     group: 'outdoor' },
+  // 城市漫游
+  exhibition: { name: '展览', color: '#8b5cf6', bg: '#f3efff', icon: 'exhibition', group: 'city' },
+  market:     { name: '市集', color: '#f59e0b', bg: '#fff5e6', icon: 'market',     group: 'city' },
+  show:       { name: '演出', color: '#ec4899', bg: '#ffeef6', icon: 'show',       group: 'city' },
+  food:       { name: '美食', color: '#ef4444', bg: '#ffecec', icon: 'food',       group: 'city' },
+  other:      { name: '其他', color: '#64748b', bg: '#f0f2f5', icon: 'other',      group: 'city' },
 };
+
+/* 引导第 1 步的分组（「其他」不参与选择，只作兜底分类） */
+const CAT_GROUPS = [
+  { key: 'outdoor', name: '户外撒野', emoji: '🏔️' },
+  { key: 'city',    name: '城市漫游', emoji: '🎨' },
+];
+const PICKABLE_CATS = Object.keys(CATEGORIES).filter(k => k !== 'other');
 
 /* ---------- 天气类型 ---------- */
 const WEATHERS = {
@@ -224,27 +238,38 @@ const STEPFUN_CONFIG = {
  */
 async function fetchAIRecommendations(prefs) {
   try {
+    const catKeys = Object.keys(CATEGORIES).filter(k => k !== 'other').join('/');
+    const catNames = Object.keys(CATEGORIES).filter(k => k !== 'other')
+      .map(k => `${CATEGORIES[k].name}(${k})`).join('、');
+    const picked = (prefs.interests || []).filter(k => CATEGORIES[k] && k !== 'other');
+    const pickedNames = picked.map(k => CATEGORIES[k].name).join('、');
+
     const system = `你是一位专业的周末旅行规划师，擅长根据用户的偏好推荐真实、可执行的目的地。
 你必须严格遵守以下输出格式：只输出一个 JSON 数组，不要输出任何解释文字、markdown 代码块或前后缀。
 数组里每个元素是一个对象，包含以下字段（全部必填）：
 {
   "title": "目的地/活动名称（具体、真实，如「莫干山轻徒步」「苏州园林一日游」）",
-  "category": "分类，只能是 exhibition/market/show/hike/food/other 之一",
+  "category": "分类，只能是 ${catKeys} 之一（${catNames}）",
   "location": "具体地点或区域",
   "distance": 距离当前城市的公里数（数字）,
   "cost": 人均花费（数字，元）,
   "transport": "建议交通方式，如 高铁1.5h / 自驾2h / 地铁直达",
   "reason": "推荐理由（一句话，说明为什么适合该用户）",
   "tags": ["2-3个标签"]
-}`;
+}
+【最重要的硬性约束】数组里每一个元素的 category 都必须来自用户选定的玩法类型，一个都不能例外。
+不要为了让结果看起来丰富就掺入其他类型（例如用户只选了徒步/漂流，就绝对不要出现咖啡馆、Live House、演出、展览、商场）。`;
+
     const transportName = prefs.transport && prefs.transport !== 'any'
       ? (TRANSPORTS.find(t => t.key === prefs.transport)?.name || prefs.transport) : '不限';
     const distanceName = prefs.distance
       ? (DISTANCES.find(d => d.key === prefs.distance)?.name || prefs.distance) : '不限';
     const companionName = prefs.companion ? (COMPANIONS[prefs.companion] || prefs.companion) : '不限';
+    // 每次请求带一个随机因子：避免同一组偏好反复拿到同一批目的地
+    const nonce = Math.random().toString(36).slice(2, 8);
     const user = `当前城市：${prefs.city || CITY.name}。
 用户偏好：
-- 兴趣类型：${(prefs.interests || []).map(k => (CATEGORIES[k] ? CATEGORIES[k].name : k)).join('、') || '不限'}
+- 玩法类型（必须严格遵守）：${pickedNames || '不限'}
 - 预算：${prefs.budget >= 999999 ? '不限' : prefs.budget + ' 元以内'}
 - 交通方式：${transportName}
 - 距离范围：${distanceName}
@@ -252,7 +277,11 @@ async function fetchAIRecommendations(prefs) {
 - 额外需求：${prefs.note || '无'}
 - 今日天气：${prefs.weather ? (WEATHERS[prefs.weather]?.name || prefs.weather) : '未知'}
 
-请推荐 5 个最适合该用户的真实周末目的地，覆盖不同风格，每个目的地都要符合上述偏好约束。`;
+要求：
+1. 推荐 8 个符合上述约束的真实周末目的地，每个 destination 必须属于「${pickedNames || '任意'}」中的某一类。
+2. 同类目的地之间要在地点、玩法上尽量不同，不要重复同一个地方。
+3. 覆盖不同价位和不同距离，方便用户挑。
+4. 本次随机因子：${nonce}（请据此给出与常见答案不同的具体地点组合）。`;
 
     const res = await fetch(STEPFUN_CONFIG.proxy, {
       method: 'POST',
@@ -265,7 +294,7 @@ async function fetchAIRecommendations(prefs) {
           { role: 'system', content: system },
           { role: 'user', content: user },
         ],
-        temperature: 0.6,
+        temperature: 0.95,
         max_tokens: 8000,
         reasoning_effort: 'low',
       }),
@@ -283,16 +312,23 @@ async function fetchAIRecommendations(prefs) {
     if (!Array.isArray(arr)) return null;
     // 规范化并补全字段
     // 按分类给一张默认真实封面图（避免 AI 结果全是纯色）
-    const CAT_IMG = {
-      exhibition: '1561214115-f2f134cc4912',
-      market: '1533900298318-6b8da08a523e',
-      show: '1470229722913-7c0e2dbbafd3',
-      hike: '1506905925346-21bda4d32df4',
-      food: '1501339847302-ac426a4a7cbb',
-      other: '1449824913935-59a10b8d2000',
+    // 每个分类准备几张实拍图轮着用，避免 AI 结果一排卡片全是同一张封面
+    const CAT_IMGS = {
+      hike: ['1551632811-561732d1e306', '1506905925346-21bda4d32df4', '1506744038136-46273834b3fb'],
+      mountain: ['1506905925346-21bda4d32df4', '1551632811-561732d1e306', '1506744038136-46273834b3fb'],
+      rafting: ['1530866495561-507c9faab2ed', '1476514525535-07fb3b4ae5f1', '1502680390469-be75c86b636f'],
+      camp: ['1537565266759-34bbc16be345', '1445308394109-4ec2920981b1', '1478131143081-80f7f84ca84d'],
+      bike: ['1485965120184-e220f721d03e', '1506744038136-46273834b3fb', '1476514525535-07fb3b4ae5f1'],
+      pick: ['1464965911861-746a04b4bca6', '1498557850523-fd3d118b962e', '1518635017498-87f514b751ba'],
+      exhibition: ['1561214115-f2f134cc4912', '1531058020387-3be344556be6', '1489599849927-2ee91cede3ba'],
+      market: ['1533900298318-6b8da08a523e', '1528605248644-14dd04022da1'],
+      show: ['1470229722913-7c0e2dbbafd3', '1489599849927-2ee91cede3ba', '1528605248644-14dd04022da1'],
+      food: ['1501339847302-ac426a4a7cbb', '1543168256-418811576931'],
+      other: ['1476514525535-07fb3b4ae5f1', '1531058020387-3be344556be6'],
     };
     return arr.filter(x => x && x.title).map((x, i) => {
       const cat = CATEGORIES[x.category] ? x.category : 'other';
+      const pool = CAT_IMGS[cat] || CAT_IMGS.other;
       return {
         id: 'ai_' + Date.now().toString(36) + '_' + i,
         title: String(x.title).slice(0, 40),
@@ -305,7 +341,7 @@ async function fetchAIRecommendations(prefs) {
         crowd: '中',
         tags: Array.isArray(x.tags) ? x.tags.map(String).slice(0, 3) : [],
         reason: String(x.reason || 'AI 根据你的偏好为你挑选'),
-        img: uimg(CAT_IMG[cat]),
+        img: uimg(pool[i % pool.length]),
         rating: 4.5,
         likes: 0,
         date: '本周末',
@@ -415,7 +451,7 @@ const DEMO_ACTIVITIES = [
     img: uimg('1501339847302-ac426a4a7cbb'), rating: 4.5, likes: 321, date: '本周末',
   },
   {
-    id: 'a6', title: '城市骑行 · 环湖落日线', category: 'hike',
+    id: 'a6', title: '城市骑行 · 环湖落日线', category: 'bike',
     location: '西湖环湖绿道', distance: 6, cost: 15,
     weatherFit: ['sunny', 'cloudy'], crowd: '中',
     tags: ['骑行', '户外', '落日'],
@@ -437,6 +473,146 @@ const DEMO_ACTIVITIES = [
     tags: ['电影', '室内', '文艺'],
     reason: '小众片单，30 元看一整天，人少安静',
     img: uimg('1489599849927-2ee91cede3ba'), rating: 4.6, likes: 98, date: '本周末',
+  },
+
+  /* ---- 户外线：登山 / 漂流 / 露营 / 骑行 / 采摘 ----
+     本地兜底池。用户只勾了某一类时，「换一个」需要始终能给出同类结果，
+     所以这一类必须有本地数据兜底（AI 不可用也不会串类）。 */
+  {
+    id: 'b1', title: '莫干山 · 剑池古道登顶', category: 'mountain',
+    location: '湖州德清 莫干山', distance: 62, cost: 80,
+    weatherFit: ['sunny', 'cloudy'], crowd: '中',
+    tags: ['登山', '竹海', '避暑'],
+    reason: '海拔 720m，竹林遮蔽不暴晒，门票学生半价',
+    img: uimg('1506905925346-21bda4d32df4'), rating: 4.7, likes: 412, date: '周日 07:00',
+  },
+  {
+    id: 'b2', title: '大明山 · 悬空栈道一日', category: 'mountain',
+    location: '杭州临安 大明山', distance: 88, cost: 110,
+    weatherFit: ['sunny', 'cloudy'], crowd: '中',
+    tags: ['登山', '索道', '云海'],
+    reason: '栈道贴崖而建，晴天能看到云海，全程 5 小时',
+    img: uimg('1551632811-561732d1e306'), rating: 4.6, likes: 268, date: '周日 06:30',
+  },
+  {
+    id: 'b3', title: '北高峰 · 灵隐后山穿越', category: 'mountain',
+    location: '西湖区 北高峰', distance: 8, cost: 0,
+    weatherFit: ['sunny', 'cloudy'], crowd: '中',
+    tags: ['登山', '免费', '地铁可达'],
+    reason: '0 元线路，地铁 3 号线转公交直达，2 小时来回',
+    img: uimg('1506744038136-46273834b3fb'), rating: 4.5, likes: 531, date: '周六 08:00',
+  },
+  {
+    id: 'b4', title: '浙西大峡谷漂流', category: 'rafting',
+    location: '杭州临安 龙岗镇', distance: 85, cost: 158,
+    weatherFit: ['sunny'], crowd: '高',
+    tags: ['漂流', '激流', '湿身'],
+    reason: '全程 3km 落差 80m，晴天水温和，人多好玩',
+    img: uimg('1530866495561-507c9faab2ed'), rating: 4.7, likes: 366, date: '周六 10:00',
+  },
+  {
+    id: 'b5', title: '桐庐富春江竹筏漂流', category: 'rafting',
+    location: '杭州桐庐 富春江', distance: 72, cost: 120,
+    weatherFit: ['sunny', 'cloudy'], crowd: '中',
+    tags: ['漂流', '竹筏', '江景'],
+    reason: '缓流段不刺激但出片，适合怕水又想漂的人',
+    img: uimg('1476514525535-07fb3b4ae5f1'), rating: 4.5, likes: 244, date: '周六 13:00',
+  },
+  {
+    id: 'b6', title: '双溪竹海漂流', category: 'rafting',
+    location: '杭州余杭 径山', distance: 36, cost: 100,
+    weatherFit: ['sunny'], crowd: '中',
+    tags: ['漂流', '近郊', '竹海'],
+    reason: '离市区 36km，公交+打车可达，不用请假',
+    img: uimg('1502680390469-be75c86b636f'), rating: 4.4, likes: 187, date: '周日 14:00',
+  },
+  {
+    id: 'b7', title: '千岛湖星空露营地', category: 'camp',
+    location: '杭州淳安 千岛湖', distance: 150, cost: 200,
+    weatherFit: ['sunny'], crowd: '低',
+    tags: ['露营', '星空', '湖景'],
+    reason: '光污染低，秋季星空最清楚，装备可现场租',
+    img: uimg('1537565266759-34bbc16be345'), rating: 4.8, likes: 298, date: '周六 16:00',
+  },
+  {
+    id: 'b8', title: '永安山营地过夜 + 滑翔伞', category: 'camp',
+    location: '杭州富阳 永安山', distance: 52, cost: 150,
+    weatherFit: ['sunny', 'cloudy'], crowd: '中',
+    tags: ['露营', '滑翔伞', '看日落'],
+    reason: '山顶营地，日落和滑翔伞同一个位置解决',
+    img: uimg('1445308394109-4ec2920981b1'), rating: 4.6, likes: 223, date: '周六 17:30',
+  },
+  {
+    id: 'b9', title: '安吉云上草原露营', category: 'camp',
+    location: '湖州安吉 云上草原', distance: 92, cost: 260,
+    weatherFit: ['sunny'], crowd: '高',
+    tags: ['露营', '草甸', '团建'],
+    reason: '海拔 1168m 的草甸营地，适合 4 人以上一起',
+    img: uimg('1478131143081-80f7f84ca84d'), rating: 4.5, likes: 176, date: '周六 15:00',
+  },
+  {
+    id: 'b10', title: '千岛湖环湖绿道骑行', category: 'bike',
+    location: '杭州淳安 千岛湖', distance: 150, cost: 80,
+    weatherFit: ['sunny', 'cloudy'], crowd: '中',
+    tags: ['骑行', '绿道', '湖景'],
+    reason: '专用骑行道 138km，可只骑最精华的 30km 段',
+    img: uimg('1485965120184-e220f721d03e'), rating: 4.8, likes: 452, date: '周日 09:00',
+  },
+  {
+    id: 'b11', title: '之江路 → 湘湖骑行线', category: 'bike',
+    location: '滨江 / 萧山 湘湖', distance: 22, cost: 15,
+    weatherFit: ['sunny', 'cloudy'], crowd: '低',
+    tags: ['骑行', '江景', '共享单车'],
+    reason: '15 元共享单车骑完全程，傍晚江风最舒服',
+    img: uimg('1485965120184-e220f721d03e'), rating: 4.6, likes: 389, date: '周日 16:30',
+  },
+  {
+    id: 'b12', title: '四明山盘山公路骑行', category: 'bike',
+    location: '宁波余姚 四明山', distance: 125, cost: 0,
+    weatherFit: ['sunny'], crowd: '低',
+    tags: ['骑行', '盘山', '进阶'],
+    reason: '连续爬坡 12km，进阶骑车党的周末考场',
+    img: uimg('1506744038136-46273834b3fb'), rating: 4.7, likes: 142, date: '周六 07:30',
+  },
+  {
+    id: 'b13', title: '余杭 · 葡萄园现摘现吃', category: 'pick',
+    location: '杭州余杭 良渚', distance: 28, cost: 60,
+    weatherFit: ['sunny', 'cloudy'], crowd: '中',
+    tags: ['采摘', '葡萄', '亲子'],
+    reason: '9 月正是葡萄尾季，入园免费按斤称',
+    img: uimg('1464965911861-746a04b4bca6'), rating: 4.5, likes: 208, date: '周日 10:00',
+  },
+  {
+    id: 'b14', title: '建德 · 猕猴桃采摘一日', category: 'pick',
+    location: '杭州建德 三都镇', distance: 118, cost: 80,
+    weatherFit: ['sunny', 'cloudy'], crowd: '低',
+    tags: ['采摘', '猕猴桃', '近郊'],
+    reason: '9-10 月正当季，园区人少，能带走的比买的多',
+    img: uimg('1498557850523-fd3d118b962e'), rating: 4.4, likes: 133, date: '周六 09:30',
+  },
+  {
+    id: 'b15', title: '临安 · 山核桃开竿体验', category: 'pick',
+    location: '杭州临安 岛石镇', distance: 76, cost: 50,
+    weatherFit: ['sunny'], crowd: '低',
+    tags: ['采摘', '山核桃', '秋收'],
+    reason: '白露开竿是临安一年一度的大事，能跟着上山捡',
+    img: uimg('1518635017498-87f514b751ba'), rating: 4.3, likes: 97, date: '周日 08:30',
+  },
+  {
+    id: 'b16', title: '九溪十八涧 · 踩水徒步线', category: 'hike',
+    location: '西湖区 九溪', distance: 9, cost: 0,
+    weatherFit: ['sunny', 'cloudy'], crowd: '中',
+    tags: ['徒步', '溪水', '免费'],
+    reason: '全程树荫加溪水，9 月走不热，公交直达',
+    img: uimg('1551632811-561732d1e306'), rating: 4.7, likes: 604, date: '周日 09:00',
+  },
+  {
+    id: 'b17', title: '徽杭古道 · 两日轻装', category: 'hike',
+    location: '杭州临安 颊口', distance: 105, cost: 180,
+    weatherFit: ['sunny', 'cloudy'], crowd: '低',
+    tags: ['徒步', '古道', '过夜'],
+    reason: '经典入门古道 15km，走完住一晚再回',
+    img: uimg('1506905925346-21bda4d32df4'), rating: 4.6, likes: 231, date: '周六 08:00',
   },
 ];
 
@@ -525,31 +701,56 @@ const DEFAULT_STATE = {
   myFavActivities: ['a1'],
   weather: 'sunny',       // sunny / cloudy / rain
   filterPrefs: { cat: 'all', budget: 100, weather: 'sunny' },
-  onboarded: false,       // 是否完成偏好引导
-  tripPrefs: {            // 出行偏好（引导流收集）
+  /* ↓↓↓ 以下均为会话态，刷新即归零（见 SESSION_ONLY），不做任何偏好记忆 ↓↓↓ */
+  onboarded: false,       // 本轮是否已走完三个问题
+  tripPrefs: {            // 本轮出行偏好（引导流收集）
     transport: 'any',     // 交通方式 key
     distance: 'near',     // 距离范围 key
     note: '',             // 额外需求备注
   },
-  aiRecommended: [],      // AI 生成的推荐结果（空则用本地推荐）
+  sessionCats: [],        // 本轮勾选的玩法类型：AI 推荐与「换一个」都锁定在这几类里
+  aiRecommended: [],      // 本轮 AI 生成的推荐结果（空则用本地推荐）
 };
 
 /* ---------- 存储层 ---------- */
+/* ---------- 存储层 ----------
+   推荐相关的状态（有没有引导过 / 收到的偏好 / AI 结果 / 筛选条件）全部属于「本次会话」：
+   既不写入本地存储，也不从本地存储恢复。
+   产品定位是「随机去哪儿」——每次刷新都必须从第一个问题重新开始，不做任何偏好记忆。 */
+const SESSION_ONLY = ['onboarded', 'aiRecommended', 'tripPrefs', 'filterPrefs', 'sessionCats'];
+
+/* 把一个 state 洗成「全新的会话态」 */
+function freshSession(s) {
+  const next = { ...s };
+  SESSION_ONLY.forEach(k => {
+    next[k] = JSON.parse(JSON.stringify(DEFAULT_STATE[k] ?? null));
+  });
+  // 兴趣偏好同理不记忆：刷新后回到「一个问题都没答」的状态
+  next.user = { ...next.user, interests: [], budget: null, companions: null };
+  return next;
+}
+
 function loadState() {
   try {
     const raw = localStorage.getItem(STORE_KEY);
     if (raw) {
       const saved = JSON.parse(raw);
-      return { ...DEFAULT_STATE, ...saved };
+      return freshSession({ ...DEFAULT_STATE, ...saved });
     }
   } catch (e) { console.warn('读取本地数据失败', e); }
-  return JSON.parse(JSON.stringify(DEFAULT_STATE));
+  return freshSession(JSON.parse(JSON.stringify(DEFAULT_STATE)));
 }
 
 let state = loadState();
 
 function saveState() {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+  try {
+    // 推荐相关字段一律不落盘
+    const persist = { ...state };
+    SESSION_ONLY.forEach(k => { delete persist[k]; });
+    persist.user = { ...persist.user, interests: [], budget: null, companions: null };
+    localStorage.setItem(STORE_KEY, JSON.stringify(persist));
+  }
   catch (e) { console.warn('保存本地数据失败', e); }
 }
 

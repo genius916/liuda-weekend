@@ -187,8 +187,8 @@ function renderHome() {
   // 天气按钮
   $('#btn-weather').innerHTML = icon(w.icon);
 
-  // 随机决策器（完成引导后才显示）
-  if (state.onboarded) renderDecider();
+  // 本次随机结果：只有真的摇出结果才渲染（不再有「今天去哪儿」这种需要再点一次的中间页）
+  if (state.onboarded && deciderResult) renderDecider();
   else $('#home-decider').innerHTML = '';
 
   // 推荐区：未完成偏好引导时，先走引导流 + 默认热门推荐
@@ -206,41 +206,98 @@ function renderHome() {
     // 标题复位：回到推荐列表上方
     placeRecoHead('top');
 
-    // 分类筛选
-    const cats = [['all', '全部'], ...Object.entries(CATEGORIES).map(([k, v]) => [k, v.name])];
-    $('#home-cats').innerHTML = cats.map(([k, name]) =>
+    // 分类筛选：只列本轮勾选过的玩法，避免筛出与偏好无关的内容
+    const cats = sessionCats();
+    const catKeys = cats.length ? cats : PICKABLE_CATS;
+    if (state.filterPrefs.cat !== 'all' && !catKeys.includes(state.filterPrefs.cat)) {
+      state.filterPrefs.cat = 'all';
+    }
+    const chipDefs = [['all', '全部'], ...catKeys.map(k => [k, CATEGORIES[k].name])];
+    $('#home-cats').innerHTML = chipDefs.map(([k, name]) =>
       `<button class="chip ${state.filterPrefs.cat === k ? 'on' : ''}" data-cat="${k}">${name}</button>`
     ).join('');
     $$('#home-cats .chip').forEach(c => c.addEventListener('click', () => {
       state.filterPrefs.cat = c.dataset.cat;
-      saveState();
       renderHome();
     }));
 
-    // 推荐列表：优先 AI 结果，否则本地推荐
-    let list = [];
-    if (state.aiRecommended.length) {
-      list = state.aiRecommended;
-      $('#home-reco-title').textContent = 'AI 为你推荐';
-      $('#home-reco-sub').textContent = '根据你的偏好生成';
-    } else {
-      list = recommend();
-      $('#home-reco-title').textContent = '为你推荐';
-      $('#home-reco-sub').textContent = `${list.length} 个活动`;
-    }
-
-    // 分类二次过滤（仅对本地推荐有意义，AI 结果也支持按分类筛）
+    // 推荐列表：优先 AI 结果，否则本地推荐；都严格限定在本轮勾选的类型内
+    let base = state.aiRecommended.length
+      ? state.aiRecommended.filter(inSessionCats)
+      : recommend().filter(inSessionCats);
+    // 顶部随机结果已经在展示的那个，不再在列表里重复出现
+    let list = base.filter(a => !deciderResult || a.id !== deciderResult.id);
     if (state.filterPrefs.cat !== 'all') {
       list = list.filter(a => a.category === state.filterPrefs.cat);
     }
 
+    const catLabel = catKeys.map(k => CATEGORIES[k].name).join(' · ');
+    if (state.aiRecommended.length) {
+      $('#home-reco-title').textContent = 'AI 为你选好了';
+      $('#home-reco-sub').textContent = `${catLabel} · 另有 ${list.length} 个备选`;
+    } else {
+      $('#home-reco-title').textContent = '同类备选';
+      $('#home-reco-sub').textContent = `${catLabel} · 共 ${list.length} 个`;
+    }
+
     if (list.length === 0) {
-      $('#home-list').innerHTML = `<div class="empty">${icon('compass')}<p>没有匹配的活动<br>试试放宽预算或切换分类</p></div>`;
+      $('#home-list').innerHTML = `<div class="empty">${icon('compass')}<p>这个玩法暂时没有更多目的地了<br>换个玩法或放宽预算试试</p></div>`;
     } else {
       $('#home-list').innerHTML = list.map((a, i) => activityCard(a, i)).join('');
       bindActivityCards();
     }
   }
+}
+
+/* 本轮勾选的玩法类型 */
+function sessionCats() {
+  return (state.sessionCats || []).filter(k => CATEGORIES[k]);
+}
+
+/* 是否落在本轮勾选的类型内（没勾过则视为不限） */
+function inSessionCats(a) {
+  const cats = sessionCats();
+  return !cats.length || cats.includes(a.category);
+}
+
+/* 本轮候选池：AI 结果在前，本地数据按标题去重补齐 */
+function sessionPool() {
+  const cats = sessionCats();
+  const ai = (state.aiRecommended || []).filter(a => !cats.length || cats.includes(a.category));
+  const local = state.activities.filter(a => !cats.length || cats.includes(a.category));
+  const seen = new Set(ai.map(a => a.title));
+  return [...ai, ...local.filter(a => !seen.has(a.title))];
+}
+
+/* 预算 / 天气只做「软过滤」：类型一致性是硬约束，预算天气只是尽量满足 */
+function refineByPrefs(pool) {
+  const { budget } = state.filterPrefs;
+  const weather = state.weather;
+  const strict = pool.filter(a => (a.cost || 0) <= budget && (!a.weatherFit || a.weatherFit.includes(weather)));
+  if (strict.length) return strict;
+  const noWeather = pool.filter(a => (a.cost || 0) <= budget);
+  if (noWeather.length) return noWeather;
+  return pool;
+}
+
+/* 打分：本地活动用推荐算法分数，AI 结果按评分折算 */
+function recScore(a) {
+  const local = recommend().find(x => x.id === a.id);
+  return local ? local.score : 1 + (a.rating || 4.5) / 10;
+}
+
+/* 组装本次请求的偏好（三个问题的答案） */
+function buildPrefs() {
+  return {
+    interests: sessionCats(),
+    budget: state.user.budget || state.filterPrefs.budget,
+    transport: state.tripPrefs.transport,
+    distance: state.tripPrefs.distance,
+    companion: state.user.companions,
+    note: state.tripPrefs.note,
+    city: CITY.name,
+    weather: state.weather,
+  };
 }
 
 /* 推荐区标题定位
@@ -296,6 +353,16 @@ const OB_COMPANIONS = [
   { key: 'group', name: '4 人以上', desc: '社团/班级团建' },
 ];
 
+/* 清空本轮问答草稿（每次刷新 / 每推荐完一轮都从头开始，不记上一轮的选择） */
+function resetDraft() {
+  obDraft.interests = [];
+  obDraft.budget = null;
+  obDraft.transport = 'any';
+  obDraft.distance = null;
+  obDraft.companions = null;
+  obDraft.note = '';
+}
+
 function renderOnboarding() {
   // 隐藏分类筛选（引导完成后再出现）
   $('#home-cats').innerHTML = '';
@@ -306,16 +373,24 @@ function renderOnboarding() {
         <div class="ob-progress"><span class="ob-dot on"></span><span class="ob-dot"></span><span class="ob-dot"></span></div>
         <div class="ob-step-label">第 1 步 · 共 3 步</div>
         <h3 class="ob-title">这周末，想去哪儿野？</h3>
-        <p class="ob-sub">选你此刻心动的玩法，可多选</p>
-        <div class="ob-options">
-          ${Object.entries(CATEGORIES).filter(([k]) => k !== 'other').map(([k, c]) => `
-            <button class="ob-opt ${obDraft.interests.includes(k) ? 'on' : ''}" data-cat="${k}">
-              <span class="ii-icon" style="--c:${c.color};--cbg:${c.bg}">${icon(c.icon)}</span>
-              ${c.name}
-            </button>`).join('')}
-        </div>
+        <p class="ob-sub">户外和城里都能选，可多选</p>
+        ${CAT_GROUPS.map(g => {
+          const list = PICKABLE_CATS.filter(k => CATEGORIES[k].group === g.key);
+          if (!list.length) return '';
+          return `
+            <div class="ob-block-label">${g.emoji} ${g.name}</div>
+            <div class="ob-options ${g.key === 'city' ? 'ob-city' : 'ob-cols-3'}">
+              ${list.map(k => {
+                const c = CATEGORIES[k];
+                return `<button class="ob-opt ${obDraft.interests.includes(k) ? 'on' : ''}" data-cat="${k}">
+                  <span class="ii-icon" style="--c:${c.color};--cbg:${c.bg}">${icon(c.icon)}</span>
+                  ${c.name}
+                </button>`;
+              }).join('')}
+            </div>`;
+        }).join('')}
         <button class="btn btn-primary ob-next" id="ob-next" ${obDraft.interests.length ? '' : 'disabled'}>
-          ${obDraft.interests.length ? '下一步' : '至少选一个'}
+          ${obDraft.interests.length ? `下一步（已选 ${obDraft.interests.length} 类）` : '至少选一个'}
         </button>
       </div>
     `;
@@ -430,126 +505,128 @@ function renderOnboarding() {
 }
 
 function finishOnboarding() {
-  state.user.interests = obDraft.interests.length ? obDraft.interests : ['exhibition', 'market', 'hike'];
+  const cats = obDraft.interests.length ? obDraft.interests.slice() : ['hike', 'mountain', 'camp'];
+  state.sessionCats = cats;              // 本轮锁定这几类，AI 推荐与「换一个」都不出界
+  state.user.interests = cats.slice();
   state.user.budget = obDraft.budget || 100;
   state.user.companions = obDraft.companions || 'small';
   state.filterPrefs.budget = state.user.budget;
+  state.filterPrefs.cat = 'all';
   state.tripPrefs.transport = obDraft.transport || 'any';
   state.tripPrefs.distance = obDraft.distance || 'near';
   state.tripPrefs.note = obDraft.note || '';
   state.onboarded = true;
-  saveState();
   obStep = 0;
-  // 生成推荐（优先走 StepFun AI）
+  // 直接进入推荐：AI 转圈结束后就出结果，中间不再有需要再点一次的界面
   generateRecommendations();
-  toast('偏好已记住，正在为你找好去处…');
 }
 
-/* 生成推荐：优先 StepFun AI，失败降级本地推荐 */
+/* 生成推荐：优先 StepFun AI，结果必须落在本轮勾选的类型内，失败降级本地同类型推荐 */
 async function generateRecommendations() {
-  const prefs = {
-    interests: state.user.interests,
-    budget: state.user.budget,
-    transport: state.tripPrefs.transport,
-    distance: state.tripPrefs.distance,
-    companion: state.user.companions,
-    note: state.tripPrefs.note,
-    city: CITY.name,
-    weather: state.weather,
-  };
+  const prefs = buildPrefs();
 
-  // 显示 AI 加载态
+  deciderResult = null;
+  deciderSeen.clear();
+  $('#home-decider').innerHTML = '';
+
+  // AI 加载态
   const listEl = $('#home-list');
   if (listEl) {
     listEl.innerHTML = `
       <div class="ai-loading">
         <div class="ai-spinner"></div>
-        <p>AI 正在根据你的偏好挑选目的地…</p>
-        <span>预算 ${state.user.budget >= 999999 ? '不限' : '≤¥' + state.user.budget} · ${TRANSPORTS.find(t => t.key === state.tripPrefs.transport)?.name || '不限交通'} · ${DISTANCES.find(d => d.key === state.tripPrefs.distance)?.name || '不限距离'}</span>
+        <p>AI 正在为你随机挑一个目的地…</p>
+        <span>${sessionCats().map(k => CATEGORIES[k].name).join(' · ')} · ${state.user.budget >= 999999 ? '预算不限' : '≤¥' + state.user.budget} · ${TRANSPORTS.find(t => t.key === state.tripPrefs.transport)?.name || '不限交通'} · ${DISTANCES.find(d => d.key === state.tripPrefs.distance)?.name || '不限距离'}</span>
       </div>
     `;
   }
 
   const aiResult = await fetchAIRecommendations(prefs);
 
-  if (aiResult && aiResult.length) {
-    state.aiRecommended = aiResult;
-    saveState();
-  } else {
+  // 类型一致性：AI 里混进来的其它类型一律丢掉（用户选了徒步，就不该出现咖啡馆、演出）
+  const cats = sessionCats();
+  const kept = (aiResult || []).filter(a => !cats.length || cats.includes(a.category));
+  const dropped = (aiResult || []).length - kept.length;
+  state.aiRecommended = kept;
+  if (!kept.length) {
     state.aiRecommended = [];
-    saveState();
-    toast('AI 暂时不可用，先用本地精选推荐');
+    toast(aiResult && aiResult.length ? 'AI 结果类型不匹配，已用本地同类型推荐' : 'AI 暂时不可用，先用本地精选推荐');
+  } else if (dropped > 0) {
+    console.warn(`已过滤 ${dropped} 条类型不符的 AI 结果`);
+  }
+
+  // AI 加载完 → 直接摇出本次结果（不再有「今天去哪儿」的中间确认）
+  const pool = refineByPrefs(sessionPool());
+  if (pool.length) {
+    deciderResult = weightedRandom(pool.map(a => ({ ...a, score: recScore(a) })));
+    if (deciderResult) deciderSeen.add(deciderResult.id);
   }
 
   renderHome();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-/* 重置偏好（我的页入口） */
-function resetOnboarding() {
-  obDraft.interests = [];
-  obDraft.budget = null;
-  obDraft.transport = 'any';
-  obDraft.distance = null;
-  obDraft.companions = null;
-  obDraft.note = '';
+/* 从头再来：清空本轮所有偏好与结果，回到第一个问题（不保留任何记忆） */
+function startOver() {
+  resetDraft();
   obStep = 0;
+  deciderResult = null;
+  deciderSeen.clear();
   state.onboarded = false;
   state.aiRecommended = [];
+  state.sessionCats = [];
+  state.filterPrefs = { cat: 'all', budget: DEFAULT_STATE.filterPrefs.budget, weather: state.weather };
+  state.user.interests = [];
+  state.user.budget = null;
+  state.user.companions = null;
+  state.tripPrefs = { transport: 'any', distance: 'near', note: '' };
   saveState();
-  switchPage('home');
-  toast('重新设置你的偏好吧');
+  if (currentPage !== 'home') switchPage('home'); else renderHome();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  toast('已清空本轮偏好，重新来一次');
 }
 
-/* ---------- 随机决策器 ---------- */
-let deciderResult = null; // 当前摇出的结果
+/* ---------- 本次随机结果 ----------
+   AI 转圈结束就直接渲染这里，没有「纠结去哪儿 / 今天去哪儿」这种需要再点一次的中间页 */
+let deciderResult = null;        // 本次摇出的结果
+const deciderSeen = new Set();   // 本轮已摇出过的 id，避免连续重复
 
 function renderDecider() {
   const el = $('#home-decider');
   if (!el) return;
+  if (!deciderResult) { el.innerHTML = ''; return; }
 
-  if (!deciderResult) {
-    el.innerHTML = `
-      <div class="decider-idle">
-        <div class="decider-title">纠结去哪儿？</div>
-        <div class="decider-sub">按你的天气 · 预算 · 兴趣，一键帮你决定</div>
-        <button class="decider-btn" id="decider-roll">
-          ${icon('compass')}
-          <span>今天去哪儿</span>
-        </button>
-      </div>
-    `;
-    $('#decider-roll').addEventListener('click', rollDecider);
-  } else {
-    const a = deciderResult;
-    const cat = getCat(a.category);
-    el.innerHTML = `
-      <div class="decider-result">
-        <div class="dr-head">
-          <span class="dr-label">${icon('flame')} 今天就去这儿</span>
-          <button class="dr-reroll" id="decider-reroll">${icon('route')} 换一个</button>
-        </div>
-        <div class="dr-card" data-id="${a.id}" data-cat="${a.category}">
-          <div class="dr-cover img-ph" data-cat="${a.category}">
-            ${coverImg(a.img, a.category, 'cover-photo')}
-            <span class="act-cat" style="background:${cat.bg};color:${cat.color}">${icon(cat.icon)}${cat.name}</span>
-          </div>
-          <div class="dr-body">
-            <h3>${a.title}</h3>
-            <div class="dr-meta">
-              <span>${icon('location')} ${a.location} · ${a.distance}km</span>
-              <span>${icon('wallet')} ${fmtCost(a.cost)}</span>
-            </div>
-            <div class="dr-reason">${icon('flame')} ${a.reason}</div>
-            <button class="btn btn-primary dr-go" id="decider-go">${icon('arrowRight')} 查看出行方案</button>
-          </div>
+  const a = deciderResult;
+  const cat = getCat(a.category);
+  el.innerHTML = `
+    <div class="decider-result">
+      <div class="dr-head">
+        <span class="dr-label">${icon('flame')} 本次结果 · ${cat.name}</span>
+        <div class="dr-actions">
+          <button class="dr-reroll" id="decider-reroll">${icon('shuffle')} 换一个</button>
+          <button class="dr-reroll" id="decider-restart" title="清空偏好，重新回答三个问题">${icon('refresh')} 换玩法</button>
         </div>
       </div>
-    `;
-    $('#decider-reroll').addEventListener('click', rollDecider);
-    $('#decider-go').addEventListener('click', () => openPlanSheet(a.id));
-    $('#decider-reroll').addEventListener('click', (e) => e.stopPropagation());
-  }
+      <div class="dr-card" data-id="${a.id}" data-cat="${a.category}">
+        <div class="dr-cover img-ph" data-cat="${a.category}">
+          ${coverImg(a.img, a.category, 'cover-photo')}
+          <span class="act-cat" style="background:${cat.bg};color:${cat.color}">${icon(cat.icon)}${cat.name}</span>
+        </div>
+        <div class="dr-body">
+          <h3>${a.title}</h3>
+          <div class="dr-meta">
+            <span>${icon('location')} ${a.location} · ${a.distance}km</span>
+            <span>${icon('wallet')} ${fmtCost(a.cost)}</span>
+          </div>
+          <div class="dr-reason">${icon('flame')} ${a.reason}</div>
+          <button class="btn btn-primary dr-go" id="decider-go">${icon('arrowRight')} 查看出行方案</button>
+        </div>
+      </div>
+    </div>
+  `;
+  $('#decider-reroll').addEventListener('click', (e) => { e.stopPropagation(); rollDecider(); });
+  $('#decider-restart').addEventListener('click', (e) => { e.stopPropagation(); startOver(); });
+  $('#decider-go').addEventListener('click', () => openPlanSheet(a.id));
 }
 
 /* 加权随机：在约束候选集内按推荐分数加权抽取 */
@@ -567,35 +644,41 @@ function weightedRandom(list) {
   return list[list.length - 1];
 }
 
-function rollDecider() {
-  // 约束过滤：当前分类 + 天气适配 + 预算内
-  const { cat, budget, weather } = state.filterPrefs;
-  let pool = state.activities.filter(a => {
-    if (cat !== 'all' && a.category !== cat) return false;
-    if (!a.weatherFit.includes(weather)) return false;
-    if (a.cost > budget) return false;
-    return true;
-  });
+/* 换一个：只在「本轮勾选的类型」内换。
+   用户选了徒步/漂流，这里就绝不会冒出咖啡厅、Live House、演出。
+   同类候选摇完一轮后，会向 AI 再要一批同类型目的地（保证结果不固定）。 */
+async function rollDecider() {
+  const cats = sessionCats();
+  const btn = $('#decider-reroll');
+  let fresh = refineByPrefs(sessionPool().filter(a => !deciderSeen.has(a.id) && a.id !== deciderResult?.id));
 
-  // 若约束下为空，降级：去掉天气约束（至少给个结果）
-  if (!pool.length) {
-    pool = state.activities.filter(a => a.cost <= budget);
+  if (!fresh.length) {
+    if (btn) btn.disabled = true;
+    const more = await fetchAIRecommendations(buildPrefs());
+    if (btn) btn.disabled = false;
+    const add = (more || []).filter(a =>
+      (!cats.length || cats.includes(a.category)) &&
+      !state.aiRecommended.some(x => x.title === a.title)
+    );
+    if (add.length) {
+      state.aiRecommended = [...state.aiRecommended, ...add];
+      deciderSeen.clear();
+      fresh = refineByPrefs(sessionPool().filter(a => a.id !== deciderResult?.id));
+    }
   }
 
-  if (!pool.length) {
-    toast('没有匹配的活动，试试放宽预算');
+  if (!fresh.length) {
+    toast(cats.length
+      ? `${cats.map(k => CATEGORIES[k].name).join('/')}这类暂时没有更多目的地了，换个玩法试试`
+      : '暂时没有更多目的地了，换个玩法试试');
     return;
   }
 
-  // 加权随机
-  const scored = pool.map(a => ({ ...a, score: recommend().find(x => x.id === a.id)?.score ?? 1 }));
-  deciderResult = weightedRandom(scored);
-
-  renderDecider();
-
-  // 摇出结果时滚动到决策器
-  const el = $('#home-decider');
-  if (el) el.scrollTop = 0;
+  const pick = weightedRandom(fresh.map(a => ({ ...a, score: recScore(a) })));
+  if (!pick) return;
+  deciderResult = pick;
+  deciderSeen.add(pick.id);
+  renderHome();   // 连列表一起重绘：新结果不会在下方重复出现
 }
 
 /* ---------- 一站式出行方案 ---------- */
@@ -1333,7 +1416,7 @@ function renderMe() {
     </div>
     <div class="me-list">
       <button class="me-row" id="me-interest">${icon('flame')}<span>兴趣偏好</span>${icon('arrowRight')}</button>
-      <button class="me-row" id="me-reonboard">${icon('compass')}<span>重新设置推荐偏好</span>${icon('arrowRight')}</button>
+      <button class="me-row" id="me-reonboard">${icon('compass')}<span>重新随机（清空偏好）</span>${icon('arrowRight')}</button>
       <button class="me-row" id="me-about">${icon('compass')}<span>关于溜达</span>${icon('arrowRight')}</button>
     </div>
   `;
@@ -1349,7 +1432,7 @@ function renderMe() {
   $('#me-teams').addEventListener('click', () => { switchPage('team'); teamFilter = 'all'; renderTeam(); });
   $('#me-checkins').addEventListener('click', () => switchPage('checkin'));
   $('#me-interest').addEventListener('click', openInterestSheet);
-  $('#me-reonboard').addEventListener('click', resetOnboarding);
+  $('#me-reonboard').addEventListener('click', startOver);
   $('#me-about').addEventListener('click', () => openSheet(`
     <h3>关于溜达</h3>
     <p style="color:var(--ink-500);line-height:1.7;font-size:14px">
@@ -1449,14 +1532,25 @@ function init() {
   // 顶部导航滚动阴影
   initScrollShadow();
 
-  // demo 模式（?demo=1）：跳过引导直接看推荐态，方便演示与评审
-  if (new URLSearchParams(location.search).has('demo')) {
+  // demo 模式（?demo=1）：跳过三个问题，直接用一组默认玩法跑完整流程，方便演示与评审
+  const demoMode = new URLSearchParams(location.search).has('demo');
+  if (demoMode) {
+    obDraft.interests = ['hike', 'mountain', 'camp'];
+    obDraft.budget = 300;
+    obDraft.distance = 'near';
+    obDraft.companions = 'small';
+    state.sessionCats = obDraft.interests.slice();
+    state.user.interests = obDraft.interests.slice();
+    state.user.budget = 300;
+    state.user.companions = 'small';
+    state.filterPrefs.budget = 300;
+    state.tripPrefs = { transport: 'any', distance: 'near', note: '' };
     state.onboarded = true;
-    if (!state.user.interests.length) state.user.interests = ['exhibition', 'market', 'hike'];
   }
 
   // 初次渲染
   renderHome();
+  if (demoMode) generateRecommendations();
 
   // 异步：IP 定位 → 拉取当地实时天气（免费，无需 key）
   initLocationAndWeather().then(() => {

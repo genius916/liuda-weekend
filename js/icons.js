@@ -16,6 +16,11 @@ const ICONS = {
   market: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h16l-1.2 12H5.2Z"/><path d="M8 8c0-2.2 1.8-4 4-4s4 1.8 4 4"/></svg>',
   show: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="2.6"/><circle cx="17" cy="16" r="2.6"/></svg>',
   hike: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 20 15"/><path d="M4 21l9-9"/><path d="M13 6l3 3"/><path d="m7 12 3 3"/><circle cx="5.5" cy="20" r="1.5"/></svg>',
+  mountain: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 19.5 9 7l3.6 6.6"/><path d="M10.5 19.5 15.5 11l6 8.5Z"/><path d="M7.4 10.2 9 12.4l1.6-2.2"/><circle cx="17" cy="5.4" r="1.6"/></svg>',
+  rafting: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14l-1.6 4.4a2 2 0 0 1-1.9 1.3H8.5a2 2 0 0 1-1.9-1.3Z"/><path d="M12 12V6.5"/><path d="M9.5 6.5h5L13 4h-2Z"/><path d="M3 20c1.6 0 1.6-1.2 3.2-1.2S7.8 20 9.4 20s1.6-1.2 3.2-1.2S14.2 20 15.8 20s1.6-1.2 3.2-1.2"/></svg>',
+  camp: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4 3.5 20h17Z"/><path d="M12 4v16"/><path d="M12 12.5 8 20"/><path d="M12 12.5 16 20"/></svg>',
+  bike: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.8" cy="17" r="3.2"/><circle cx="18.2" cy="17" r="3.2"/><path d="M5.8 17 10 8.5h4.2l4 8.5"/><path d="M9.4 8.5h3.4"/><path d="M12.4 6.2h2.4"/></svg>',
+  pick: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15c0-3.4 2.6-6 6-6"/><path d="M4 15a3 3 0 0 0 3 3h10"/><path d="M12 9c0-2 1.4-3.4 3.4-3.4S19 7.4 19 9.4 17.2 13 15.4 13 12 11 12 9Z"/><path d="M12 9V4.5"/></svg>',
   food: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v7a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V3"/><path d="M8 3v18"/><path d="M15 3c-1.5 0-3 2-3 4s1.5 4 3 4"/><path d="M15 3v18"/></svg>',
   other: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>',
 
@@ -52,6 +57,7 @@ const ICONS = {
   spark: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.6 6.4L20 10l-6.4 1.6L12 18l-1.6-6.4L4 10l6.4-1.6Z"/><path d="M19 15l.8 3.2L23 19l-3.2.8L19 23l-.8-3.2L15 19l3.2-.8Z"/></svg>',
   quill: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 3c-4.5 0-9 2.5-11 7-1.2 2.7-1.3 5.4-1 7.5"/><path d="M20 3c1 5-1.5 9.5-5.5 11.5C11.5 16 9 16 8 15.5"/><path d="M5 21c1.5-3.5 4-6 7-7.5"/></svg>',
   shuffle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3.5 20.5 7 17 10.5"/><path d="M20.5 7H16a4 4 0 0 0-3.2 1.6L9 14a4 4 0 0 1-3.2 1.6H3.5"/><path d="M17 13.5 20.5 17 17 20.5"/><path d="M20.5 17H16a4 4 0 0 1-3.2-1.6l-.6-.8"/><path d="M3.5 7h2.3A4 4 0 0 1 9 8.6l.6.8"/></svg>',
+  refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 12a8.5 8.5 0 1 1-2.6-6.1"/><path d="M20.5 4.5V11H14"/></svg>',
 };
 
 /* 获取图标 HTML（可选颜色） */
