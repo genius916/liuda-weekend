@@ -3,10 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1">
-  <meta name="theme-color" content="#10b981">
+  <meta name="theme-color" id="meta-theme-color" content="#10b981">
   <meta name="description" content="溜达 · 周末城市探索指南，智能推荐、组队出发、打卡记录、攻略分享。周末不宅，去溜达。">
   <title>溜达 · 周末城市探索指南</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%2310b981'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif'>溜</text></svg>">
+  <script>
+    /* 首屏绘制前先定主题，避免夜间模式用户看到一帧白闪。
+       优先级：用户手动选择（localStorage）> 系统偏好。 */
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem('liuda-theme'); } catch (e) {}
+      if (t !== 'dark' && t !== 'light') {
+        t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+      }
+      document.documentElement.dataset.theme = t;
+      document.documentElement.style.colorScheme = t;
+    })();
+  </script>
   <link rel="stylesheet" href="css/style.css?v=dev">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
@@ -21,7 +34,7 @@
           溜达
         </div>
         <div class="action">
-          <button id="btn-weather" aria-label="查看今日天气" title="查看今日天气"></button>
+          <button id="btn-weather" aria-label="切换到夜间模式" title="切换到夜间模式"></button>
           <button id="btn-notice" aria-label="通知">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.5S4 15.5 4 9.8A4.6 4.6 0 0 1 12 6a4.6 4.6 0 0 1 8 3.8c0 5.7-8 10.7-8 10.7Z"/></svg>
           </button>

@@ -29,6 +29,72 @@ function avatar(name, color) {
   return `<span class="avatar" style="background:${color}">${name ? name[0] : '我'}</span>`;
 }
 
+/* ---------- 主题（明 / 暗）切换 ----------
+   顶栏右上角按钮：白天显示太阳、夜间显示月亮，点击即切换。
+   ⚠️ 这里的 localStorage 只记「界面皮肤」，与「推荐永不记忆」的会话态规则互不影响：
+   SESSION_ONLY 那套是推荐偏好，主题属于纯 UI 偏好。 */
+const THEME_KEY = 'liuda-theme';
+
+function systemTheme() {
+  return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+}
+
+function currentTheme() {
+  return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+}
+
+/* 一次同步：根节点属性 + 顶栏图标 + 按钮可访问性文案 + 浏览器状态栏颜色 */
+function applyTheme(theme, persist) {
+  const t = theme === 'dark' ? 'dark' : 'light';
+  const root = document.documentElement;
+
+  root.dataset.theme = t;
+  root.style.colorScheme = t;
+
+  const btn = $('#btn-weather');
+  if (btn) {
+    const want = t === 'dark' ? 'moon' : 'sunny';
+    // 图标没变就不重绘，避免 renderHome() 频繁调用时把切换动画反复重播
+    if (btn.dataset.icon !== want) {
+      btn.dataset.icon = want;
+      btn.innerHTML = icon(want);
+    }
+    const label = t === 'dark' ? '切换到白天模式' : '切换到夜间模式';
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+  }
+
+  const meta = $('#meta-theme-color');
+  if (meta) meta.setAttribute('content', t === 'dark' ? '#141817' : '#10b981');
+
+  if (persist) {
+    try { localStorage.setItem(THEME_KEY, t); } catch (e) {}
+  }
+}
+
+function toggleTheme() {
+  const next = currentTheme() === 'dark' ? 'light' : 'dark';
+  applyTheme(next, true);
+  toast(next === 'dark' ? '已切换到夜间模式' : '已切换到白天模式');
+}
+
+/* 初始化：没有手动选择时跟随系统偏好 */
+function initTheme() {
+  let saved = null;
+  try { saved = localStorage.getItem(THEME_KEY); } catch (e) {}
+  applyTheme(saved === 'dark' || saved === 'light' ? saved : systemTheme(), false);
+
+  // 用户尚未手动选择过时，系统主题变化实时跟随
+  const mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
+  if (mq && mq.addEventListener) {
+    mq.addEventListener('change', e => {
+      let s = null;
+      try { s = localStorage.getItem(THEME_KEY); } catch (err) {}
+      if (s !== 'dark' && s !== 'light') applyTheme(e.matches ? 'dark' : 'light', false);
+    });
+  }
+}
+
 /* ---------- 页面切换 ---------- */
 let currentPage = 'home';
 
@@ -184,9 +250,8 @@ function renderHome() {
     openCultureSheet();
   });
 
-  // 天气按钮（顶栏图标跟随当前天气，点击同样打开详情）
-  $('#btn-weather').innerHTML = icon(w.icon);
-  $('#btn-weather').title = `${cityLabel} · ${w.name}${tempStr ? ' ' + tempStr : ''}，点击看今日天气`;
+  // 顶栏右上角按钮 = 主题明暗切换（不再打开天气详情，页面上已有独立天气信息框）
+  applyTheme(currentTheme(), false);
 
   // 本次随机结果：只有真的摇出结果才渲染（不再有「今天去哪儿」这种需要再点一次的中间页）
   if (state.onboarded && deciderResult) renderDecider();
@@ -1584,8 +1649,9 @@ function init() {
   // 通知按钮（演示）
   $('#btn-notice').addEventListener('click', () => toast('暂无新通知'));
 
-  // 顶栏天气按钮：打开今日天气详情（此前漏绑事件，点上去没反应）
-  $('#btn-weather').addEventListener('click', openWeatherSheet);
+  // 顶栏右上角按钮：主题明暗切换（白天=太阳 / 夜间=月亮，图标与配色同步）
+  $('#btn-weather').addEventListener('click', toggleTheme);
+  initTheme();
 
   // 组队筛选按钮（演示）
   $('#btn-team-filter').addEventListener('click', () => toast('筛选：全部类型'));

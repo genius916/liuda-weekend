@@ -74,6 +74,14 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* 主题切换过渡：声明在组件样式之前，避免覆盖组件自身的 transition
+   （写在后面的 .hero-weather / .sheet 等会自然接管各自的 transition） */
+body, .app, .card, .topbar, .tabbar {
+  transition: background-color .28s var(--ease-smooth),
+              border-color .28s var(--ease-smooth),
+              color .2s var(--ease-smooth);
+}
+
 h1, h2, h3, h4 { font-family: var(--font-display); letter-spacing: -0.01em; }
 
 button { font-family: inherit; cursor: pointer; border: none; background: none; }
@@ -424,7 +432,8 @@ img { display: block; max-width: 100%; }
   gap: 10px;
   box-shadow: var(--shadow-1);
   cursor: pointer;
-  transition: transform .2s var(--ease-spring), box-shadow .2s;
+  transition: transform .2s var(--ease-spring), box-shadow .2s,
+              background-color .28s var(--ease-smooth), border-color .28s var(--ease-smooth);
 }
 .hero-weather:active, .hero-budget:active { transform: scale(.96); }
 .hero-icon {
@@ -1037,64 +1046,128 @@ img { display: block; max-width: 100%; }
 .g-cover[data-cover="4"] { background: linear-gradient(135deg, #bfe3ff, #60a5fa); }
 
 /* ============================================================
-   深色模式（prefers-color-scheme 自动适配）
+   主题（明 / 暗）—— 由右上角按钮手动切换
+   · html[data-theme="light"]  白天：以白色为主，明亮通透
+   · html[data-theme="dark"]   夜间：暗色配色，适合夜晚浏览
+   data-theme 由 index.html <head> 内联脚本在首屏绘制前写入，
+   避免「先亮后暗」的白闪；无手动偏好时取系统偏好作为默认值。
    ============================================================ */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ink-900: #f2f5f4;
-    --ink-700: #d6dbd9;
-    --ink-500: #a6aeab;
-    --ink-400: #7f8885;
-    --ink-300: #5c6461;
-    --ink-200: #3a4140;
-    --ink-100: #2a302f;
-    --ink-50:  #1b201f;
 
-    --mint-50:  #0d2b22;
-    --mint-100: #123b2f;
-    --shadow-1: 0 1px 2px rgba(0,0,0,.4);
-    --shadow-2: 0 2px 8px rgba(0,0,0,.5);
-    --shadow-3: 0 8px 24px rgba(0,0,0,.6);
-  }
+/* ---------- 白天模式：白色为主 ---------- */
+html[data-theme="light"],
+html[data-theme="light"] body,
+html[data-theme="light"] .app {
+  background: #ffffff;
+}
+html[data-theme="light"] .topbar {
+  background: linear-gradient(#ffffff, rgba(255,255,255,.94));
+}
+html[data-theme="light"] .tabbar {
+  background: rgba(255,255,255,.9);
+}
 
-  body { background: #141817; }
+/* ---------- 夜间模式：暗色令牌 ---------- */
+html[data-theme="dark"] {
+  --ink-900: #f2f5f4;
+  --ink-700: #d6dbd9;
+  --ink-500: #a6aeab;
+  --ink-400: #7f8885;
+  --ink-300: #5c6461;
+  --ink-200: #3a4140;
+  --ink-100: #2a302f;
+  --ink-50:  #1b201f;
 
-  /* 卡片背景转深色 */
-  .card, .hero-weather, .hero-budget, .cs-item,
-  .me-stats, .me-list, .search-bar, .budget-opt,
-  .weather-opt, .sheet, .photo-cell, .back-top {
-    background: #222726;
-    border-color: var(--ink-100);
-  }
+  --mint-50:  #0d2b22;
+  --mint-100: #123b2f;
+  --shadow-1: 0 1px 2px rgba(0,0,0,.4);
+  --shadow-2: 0 2px 8px rgba(0,0,0,.5);
+  --shadow-3: 0 8px 24px rgba(0,0,0,.6);
+}
 
-  .sheet { background: #1b201f; }
+html[data-theme="dark"] body,
+html[data-theme="dark"] .app { background: #141817; }
 
-  .tabbar { background: rgba(27,32,31,.85); border-color: var(--ink-100); }
+/* 卡片背景转深色 */
+html[data-theme="dark"] .card,
+html[data-theme="dark"] .hero-weather,
+html[data-theme="dark"] .hero-budget,
+html[data-theme="dark"] .cs-item,
+html[data-theme="dark"] .me-stats,
+html[data-theme="dark"] .me-list,
+html[data-theme="dark"] .search-bar,
+html[data-theme="dark"] .budget-opt,
+html[data-theme="dark"] .weather-opt,
+html[data-theme="dark"] .sheet,
+html[data-theme="dark"] .photo-cell,
+html[data-theme="dark"] .back-top {
+  background: #222726;
+  border-color: var(--ink-100);
+}
 
-  .topbar {
-    background: linear-gradient(#141817, rgba(20,24,23,.92));
-  }
+html[data-theme="dark"] .sheet { background: #1b201f; }
 
-  .act-body h3, .team-title h3, .g-body h3,
-  .ck-head h3, .detail h2, .me-info h3 { color: var(--ink-900); }
+html[data-theme="dark"] .tabbar { background: rgba(27,32,31,.85); border-color: var(--ink-100); }
 
-  .field input, .field textarea, .field select {
-    background: #1b201f;
-    border-color: var(--ink-200);
-    color: var(--ink-900);
-  }
+html[data-theme="dark"] .topbar {
+  background: linear-gradient(#141817, rgba(20,24,23,.92));
+}
 
-  .mini-tag { background: var(--ink-100); color: var(--ink-500); }
+html[data-theme="dark"] .act-body h3,
+html[data-theme="dark"] .team-title h3,
+html[data-theme="dark"] .g-body h3,
+html[data-theme="dark"] .ck-head h3,
+html[data-theme="dark"] .detail h2,
+html[data-theme="dark"] .me-info h3 { color: var(--ink-900); }
 
-  .btn-ghost { background: var(--ink-100); color: var(--ink-700); }
-  .btn-outline { background: transparent; color: var(--mint-400); border-color: var(--mint-600); }
+html[data-theme="dark"] .field input,
+html[data-theme="dark"] .field textarea,
+html[data-theme="dark"] .field select {
+  background: #1b201f;
+  border-color: var(--ink-200);
+  color: var(--ink-900);
+}
 
-  /* 分类封面在深色下降低亮度 */
-  .act-img::after, .g-cover::after, .ck-img::after, .detail-img::after {
-    background-image:
-      radial-gradient(circle at 80% 20%, rgba(255,255,255,.12), transparent 45%),
-      radial-gradient(circle at 20% 80%, rgba(0,0,0,.2), transparent 40%);
-  }
+html[data-theme="dark"] .mini-tag { background: var(--ink-100); color: var(--ink-500); }
+
+html[data-theme="dark"] .btn-ghost { background: var(--ink-100); color: var(--ink-700); }
+html[data-theme="dark"] .btn-outline { background: transparent; color: var(--mint-400); border-color: var(--mint-600); }
+
+/* 引导卡片（三个问题）——白底卡片必须一并转暗，否则白底 + 浅色标题会「白字白底」看不见 */
+html[data-theme="dark"] .ob-card { background: #222726; border-color: var(--ink-100); }
+html[data-theme="dark"] .ob-opt { border-color: transparent; }
+html[data-theme="dark"] .ob-opt.on { background: var(--mint-50); border-color: var(--mint-600); }
+
+/* 输入框聚焦时不要闪回白色 */
+html[data-theme="dark"] .field input:focus,
+html[data-theme="dark"] .field textarea:focus,
+html[data-theme="dark"] .field select:focus { background: #1b201f; }
+
+/* 浅色小色块（暖色图标底、警示条）在暗色下换成低饱和深底 */
+html[data-theme="dark"] .hero-budget .hero-icon { background: rgba(217,119,6,.2); color: #fbbf24; }
+html[data-theme="dark"] .act-reason.warn { background: #3a2e14; color: #f0b357; }
+
+/* 分类色块图标（引导页 / 组队卡片）：色值是逐个分类内联写死的，
+   用 brightness 统一压暗，既去掉夜间刺眼的高亮，又保留品牌色可辨识度。
+   ── 不处理 .act-cat / .fav-btn：它们浮在照片上，本来就该亮，压暗反而看不清。 */
+html[data-theme="dark"] .ii-icon,
+html[data-theme="dark"] .icon-badge { filter: brightness(.74) saturate(.9); }
+
+/* 分类封面在深色下降低亮度 */
+html[data-theme="dark"] .act-img::after,
+html[data-theme="dark"] .g-cover::after,
+html[data-theme="dark"] .ck-img::after,
+html[data-theme="dark"] .detail-img::after {
+  background-image:
+    radial-gradient(circle at 80% 20%, rgba(255,255,255,.12), transparent 45%),
+    radial-gradient(circle at 20% 80%, rgba(0,0,0,.2), transparent 40%);
+}
+
+/* ---------- 顶栏主题按钮 ---------- */
+#btn-weather { display: flex; align-items: center; justify-content: center; }
+#btn-weather svg { animation: themeIconIn .34s var(--ease-spring); }
+@keyframes themeIconIn {
+  from { opacity: 0; transform: rotate(-80deg) scale(.5); }
+  to   { opacity: 1; transform: rotate(0) scale(1); }
 }
 
 /* ============================================================
@@ -1155,11 +1228,9 @@ img { display: block; max-width: 100%; }
 .ps-desc { font-size: 13px; color: var(--ink-500); margin-top: 2px; line-height: 1.5; }
 .plan-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
-/* 深色模式下的决策器结果卡片 */
-@media (prefers-color-scheme: dark) {
-  .dr-card { background: #222726; border-color: var(--mint-700); }
-  .dr-label { color: var(--mint-400); }
-}
+/* 夜间模式下的决策器结果卡片 */
+html[data-theme="dark"] .dr-card { background: #222726; border-color: var(--mint-700); }
+html[data-theme="dark"] .dr-label { color: var(--mint-400); }
 
 /* ============================================================
    真实封面图 + 推荐依据徽章 + 偏好引导向导
@@ -1377,11 +1448,9 @@ img { display: block; max-width: 100%; }
 .hot-block { margin-top: 0; }
 .hot-list { padding-bottom: 8px; }
 
-/* 深色模式：AI 加载态文字 */
-@media (prefers-color-scheme: dark) {
-  .ai-loading p { color: var(--ink-700); }
-  .ob-block-label { color: var(--ink-500); }
-}
+/* 夜间模式：AI 加载态文字 */
+html[data-theme="dark"] .ai-loading p { color: var(--ink-700); }
+html[data-theme="dark"] .ob-block-label { color: var(--ink-500); }
 
 /* ============================================================
    天气详情（自动获取，只读展示）
@@ -1434,12 +1503,11 @@ img { display: block; max-width: 100%; }
 .budget-opt b { font-size: 15px; }
 .budget-opt span { font-size: 11px; opacity: .75; }
 
-/* 深色模式 */
-@media (prefers-color-scheme: dark) {
-  .weather-now { background: linear-gradient(135deg, #12332a, #16241f); }
-  .wg-item, .wf-item { background: #1b201f; }
-  .weather-note { background: #0d2b22; color: var(--ink-400); }
-}
+/* 夜间模式 */
+html[data-theme="dark"] .weather-now { background: linear-gradient(135deg, #12332a, #16241f); }
+html[data-theme="dark"] .wg-item,
+html[data-theme="dark"] .wf-item { background: #1b201f; }
+html[data-theme="dark"] .weather-note { background: #0d2b22; color: var(--ink-400); }
 
 /* ============================================================
    城市文化板块（hero 右侧卡片 + 详情弹层）
@@ -1547,22 +1615,20 @@ img { display: block; max-width: 100%; }
   margin-top: 8px; padding-top: 8px; border-top: 1px dashed #f0e8d6;
 }
 
-/* 深色模式 */
-@media (prefers-color-scheme: dark) {
-  .hero-culture {
-    background: linear-gradient(145deg, #262218, #201d15);
-    border-color: #3a3323;
-  }
-  .culture-text { color: #ece1c8; }
-  .culture-from { color: #9c8f72; }
-  .culture-city { color: #a89a78; }
-  .culture-city.local { color: var(--mint-400); }
-  .culture-label { color: #c9ab6a; }
-  .culture-item {
-    background: linear-gradient(145deg, #262218, #201d15);
-    border-color: #3a3323;
-  }
-  .ci-text { color: #ece1c8; }
-  .ci-from { color: #9c8f72; }
-  .ci-note { border-top-color: #3a3323; }
+/* 夜间模式 */
+html[data-theme="dark"] .hero-culture {
+  background: linear-gradient(145deg, #262218, #201d15);
+  border-color: #3a3323;
 }
+html[data-theme="dark"] .culture-text { color: #ece1c8; }
+html[data-theme="dark"] .culture-from { color: #9c8f72; }
+html[data-theme="dark"] .culture-city { color: #a89a78; }
+html[data-theme="dark"] .culture-city.local { color: var(--mint-400); }
+html[data-theme="dark"] .culture-label { color: #c9ab6a; }
+html[data-theme="dark"] .culture-item {
+  background: linear-gradient(145deg, #262218, #201d15);
+  border-color: #3a3323;
+}
+html[data-theme="dark"] .ci-text { color: #ece1c8; }
+html[data-theme="dark"] .ci-from { color: #9c8f72; }
+html[data-theme="dark"] .ci-note { border-top-color: #3a3323; }
