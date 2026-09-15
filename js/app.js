@@ -94,6 +94,9 @@ function renderHome() {
   // 天气按钮
   $('#btn-weather').innerHTML = icon(w.icon);
 
+  // 随机决策器
+  renderDecider();
+
   // 分类筛选
   const cats = [['all', '全部'], ...Object.entries(CATEGORIES).map(([k, v]) => [k, v.name])];
   $('#home-cats').innerHTML = cats.map(([k, name]) =>
@@ -114,6 +117,171 @@ function renderHome() {
     $('#home-list').innerHTML = list.map((a, i) => activityCard(a, i)).join('');
     bindActivityCards();
   }
+}
+
+/* ---------- 随机决策器 ---------- */
+let deciderResult = null; // 当前摇出的结果
+
+function renderDecider() {
+  const el = $('#home-decider');
+  if (!el) return;
+
+  if (!deciderResult) {
+    el.innerHTML = `
+      <div class="decider-idle">
+        <div class="decider-title">纠结去哪儿？</div>
+        <div class="decider-sub">按你的天气 · 预算 · 兴趣，一键帮你决定</div>
+        <button class="decider-btn" id="decider-roll">
+          ${icon('compass')}
+          <span>今天去哪儿</span>
+        </button>
+      </div>
+    `;
+    $('#decider-roll').addEventListener('click', rollDecider);
+  } else {
+    const a = deciderResult;
+    const cat = getCat(a.category);
+    el.innerHTML = `
+      <div class="decider-result">
+        <div class="dr-head">
+          <span class="dr-label">${icon('flame')} 今天就去这儿</span>
+          <button class="dr-reroll" id="decider-reroll">${icon('route')} 换一个</button>
+        </div>
+        <div class="dr-card" data-id="${a.id}" data-cat="${a.category}">
+          <div class="dr-cover img-ph" data-cat="${a.category}">
+            <span class="act-cat" style="background:${cat.bg};color:${cat.color}">${icon(cat.icon)}${cat.name}</span>
+          </div>
+          <div class="dr-body">
+            <h3>${a.title}</h3>
+            <div class="dr-meta">
+              <span>${icon('location')} ${a.location} · ${a.distance}km</span>
+              <span>${icon('wallet')} ${fmtCost(a.cost)}</span>
+            </div>
+            <div class="dr-reason">${icon('flame')} ${a.reason}</div>
+            <button class="btn btn-primary dr-go" id="decider-go">${icon('arrowRight')} 查看出行方案</button>
+          </div>
+        </div>
+      </div>
+    `;
+    $('#decider-reroll').addEventListener('click', rollDecider);
+    $('#decider-go').addEventListener('click', () => openPlanSheet(a.id));
+    $('#decider-reroll').addEventListener('click', (e) => e.stopPropagation());
+  }
+}
+
+/* 加权随机：在约束候选集内按推荐分数加权抽取 */
+function weightedRandom(list) {
+  if (!list.length) return null;
+  // 分数可能为负，平移到正数区间做权重
+  const minScore = Math.min(...list.map(a => a.score));
+  const weights = list.map(a => Math.pow(2, (a.score - minScore) / 2)); // 指数放大差异，但保留随机性
+  const total = weights.reduce((s, w) => s + w, 0);
+  let r = Math.random() * total;
+  for (let i = 0; i < list.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return list[i];
+  }
+  return list[list.length - 1];
+}
+
+function rollDecider() {
+  // 约束过滤：当前分类 + 天气适配 + 预算内
+  const { cat, budget, weather } = state.filterPrefs;
+  let pool = state.activities.filter(a => {
+    if (cat !== 'all' && a.category !== cat) return false;
+    if (!a.weatherFit.includes(weather)) return false;
+    if (a.cost > budget) return false;
+    return true;
+  });
+
+  // 若约束下为空，降级：去掉天气约束（至少给个结果）
+  if (!pool.length) {
+    pool = state.activities.filter(a => a.cost <= budget);
+  }
+
+  if (!pool.length) {
+    toast('没有匹配的活动，试试放宽预算');
+    return;
+  }
+
+  // 加权随机
+  const scored = pool.map(a => ({ ...a, score: recommend().find(x => x.id === a.id)?.score ?? 1 }));
+  deciderResult = weightedRandom(scored);
+
+  renderDecider();
+
+  // 摇出结果时滚动到决策器
+  const el = $('#home-decider');
+  if (el) el.scrollTop = 0;
+}
+
+/* ---------- 一站式出行方案 ---------- */
+function openPlanSheet(activityId) {
+  const a = getActivity(activityId);
+  if (!a) return;
+  const cat = getCat(a.category);
+  const w = getWeather(state.weather);
+  const fit = a.weatherFit.includes(state.weather);
+  const canTeam = state.teams.some(t => t.activityId === a.id);
+
+  openSheet(`
+    <div class="plan">
+      <div class="plan-cover img-ph" data-cat="${a.category}">
+        <span class="act-cat" style="background:${cat.bg};color:${cat.color}">${icon(cat.icon)}${cat.name}</span>
+      </div>
+      <h2>${a.title}</h2>
+      <div class="plan-rate">${icon('star')} ${a.rating} · ${a.likes} 人想去</div>
+
+      <div class="plan-steps">
+        <div class="ps-item">
+          <div class="ps-num">1</div>
+          <div class="ps-body">
+            <div class="ps-title">怎么去</div>
+            <div class="ps-desc">${a.location}（距你 ${a.distance}km）${a.distance <= 3 ? '，步行或骑行即可达' : '，建议地铁/公交'} </div>
+          </div>
+        </div>
+        <div class="ps-item">
+          <div class="ps-num">2</div>
+          <div class="ps-body">
+            <div class="ps-title">什么时间去</div>
+            <div class="ps-desc">${a.date} · 当前天气${fit ? '适合' : '不太适合'}，${w.desc}</div>
+          </div>
+        </div>
+        <div class="ps-item">
+          <div class="ps-num">3</div>
+          <div class="ps-body">
+            <div class="ps-title">花多少</div>
+            <div class="ps-desc">${fmtCost(a.cost)}${a.cost > 0 ? ' / 人' : ''}，在你的预算 ${fmtCost(state.filterPrefs.budget)} 内</div>
+          </div>
+        </div>
+        <div class="ps-item">
+          <div class="ps-num">4</div>
+          <div class="ps-body">
+            <div class="ps-title">和谁去</div>
+            <div class="ps-desc">${canTeam ? '已有组队，可直接加入' : '暂无组队，可发起一个'}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="plan-actions">
+        <button class="btn btn-outline" id="plan-team">${icon('team')} ${canTeam ? '加入组队' : '发起组队'}</button>
+        <button class="btn btn-primary" id="plan-checkin">${icon('checkin')} 去完来打卡</button>
+      </div>
+    </div>
+  `);
+
+  $('#plan-team').addEventListener('click', () => {
+    closeSheet();
+    if (canTeam) {
+      switchPage('team');
+    } else {
+      openPublishTeam(activityId);
+    }
+  });
+  $('#plan-checkin').addEventListener('click', () => {
+    closeSheet();
+    openCheckinSheet(activityId);
+  });
 }
 
 function activityCard(a, i) {
