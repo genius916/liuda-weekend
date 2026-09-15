@@ -127,7 +127,8 @@ async function fetchAIRecommendations(prefs) {
           { role: 'user', content: user },
         ],
         temperature: 0.6,
-        max_tokens: 2000,
+        max_tokens: 8000,
+        reasoning_effort: 'low',
       }),
     });
     if (!res.ok) return null;
