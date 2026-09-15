@@ -261,6 +261,8 @@ img { display: block; max-width: 100%; }
   transition: transform .2s var(--ease-spring), box-shadow .2s, opacity .2s;
 }
 .btn:active { transform: scale(.96); }
+/* ⚠️ 必须显式约束按钮内联 SVG 尺寸：SVG 无 width/height 时会被 flex 拉伸到巨幅 */
+.btn svg { width: 18px; height: 18px; flex-shrink: 0; }
 .btn-primary {
   background: var(--mint-500);
   color: #fff;

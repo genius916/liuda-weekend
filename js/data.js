@@ -39,10 +39,14 @@ let CITY = { ...DEFAULT_CITY };
 
 /**
  * IP 定位获取用户所在城市 + 经纬度
- * 主源：api.vore.top（返回中文城市名，免费、支持 CORS）
- *       → Open-Meteo Geocoding 反查经纬度
- * 备用：ipinfo.io（直接返回经纬度）
- * 全部失败返回 null，由调用方兜底默认城市
+ * 链路：ipinfo.io 取经纬度（有 CORS）
+ *   → BigDataCloud 反向地理编码取中文城市/省份（有 CORS，localityLanguage=zh）
+ *   → 反查失败退回英文城市名映射表 EN2CN_CITY
+ *   → 全失败返回 null，由调用方兜底默认城市
+ *
+ * ⚠️ 曾用 api.vore.top 直接取中文城市名，但它响应里没有 Access-Control-Allow-Origin
+ *    （实测多次 GET 均无），浏览器跨域必被拦；且行为不稳定——偶尔能通、偶尔 Failed to fetch，
+ *    导致城市名随机变化。已弃用，切勿再引入无 CORS 头的定位接口。
  */
 const EN2CN_CITY = {
   Beijing: '北京', Shanghai: '上海', Guangzhou: '广州', Shenzhen: '深圳',
@@ -54,52 +58,42 @@ const EN2CN_CITY = {
   Wenzhou: '温州', Jiaxing: '嘉兴', Shaoxing: '绍兴', Jinhua: '金华',
 };
 
-async function geocodeCity(name) {
+/* 去掉行政区划后缀，让"杭州市"→"杭州"、"浙江省"→"浙江" */
+function shortName(s) {
+  return String(s || '').replace(/[市省都道府]$/, '').trim();
+}
+
+/* 经纬度 → 中文城市/省份（BigDataCloud 免费、无需 key、带 CORS） */
+async function reverseGeocode(lat, lng) {
   try {
-    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=zh&format=json`;
+    const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=zh`;
     const res = await fetch(url);
     if (!res.ok) return null;
     const d = await res.json();
-    const hit = d?.results?.[0];
-    if (!hit) return null;
-    return { lat: hit.latitude, lng: hit.longitude };
+    const name = shortName(d.city || d.locality);
+    if (!name) return null;
+    return { name, region: shortName(d.principalSubdivision), country: d.countryName || '' };
   } catch (e) {
     return null;
   }
 }
 
 async function fetchLocation() {
-  // 主源：vore.top（中文城市名）
-  try {
-    const res = await fetch('https://api.vore.top/api/IPdata');
-    if (res.ok) {
-      const d = await res.json();
-      const rawCity = d?.ipdata?.info2 || d?.adcode?.c || '';
-      const city = String(rawCity).replace(/[市省]$/, '');
-      const region = String(d?.ipdata?.info1 || '').replace(/[市省]$/, '');
-      if (city) {
-        const geo = await geocodeCity(city);
-        if (geo) return { name: city, region, lat: geo.lat, lng: geo.lng };
-      }
-    }
-  } catch (e) { /* 继续走备用源 */ }
-
-  // 备用源：ipinfo.io（直接给经纬度）
   try {
     const res = await fetch('https://ipinfo.io/json');
-    if (res.ok) {
-      const d = await res.json();
-      if (d && d.loc) {
-        const [lat, lng] = String(d.loc).split(',').map(Number);
-        if (isFinite(lat) && isFinite(lng)) {
-          const cn = EN2CN_CITY[d.city] || d.city || DEFAULT_CITY.name;
-          return { name: cn, region: '', lat, lng };
-        }
-      }
-    }
-  } catch (e) { /* 走兜底 */ }
+    if (!res.ok) return null;
+    const d = await res.json();
+    const [lat, lng] = String(d?.loc || '').split(',').map(Number);
+    if (!isFinite(lat) || !isFinite(lng)) return null;
 
-  return null;
+    const rev = await reverseGeocode(lat, lng);
+    if (rev) return { name: rev.name, region: rev.region, country: rev.country, lat, lng };
+
+    // 反查失败：退回英文城市名映射
+    return { name: EN2CN_CITY[d.city] || d.city || DEFAULT_CITY.name, region: '', country: '', lat, lng };
+  } catch (e) {
+    return null;
+  }
 }
 
 /* ---------- 交通方式 ---------- */

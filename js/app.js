@@ -138,10 +138,18 @@ function startCultureTimer() {
   }, CULTURE_ROTATE_MS);
 }
 
+/* 城市显示名：省份与城市重复时（如"东京"与"东京都"）不重复拼接 */
+function cityDisplay() {
+  const n = CITY.name || '';
+  const r = CITY.region || '';
+  if (!r || r === n || r.includes(n)) return n;
+  return n + '·' + r;
+}
+
 function renderHome() {
   const w = getWeather(state.weather);
   const tempStr = realWeather ? `${realWeather.temp}°` : '';
-  const cityLabel = CITY.name + (CITY.region && CITY.region !== CITY.name ? '·' + CITY.region : '');
+  const cityLabel = cityDisplay();
 
   if (!currentCulture) {
     const first = pickCulture();
@@ -724,7 +732,7 @@ function toggleFavActivity(id) {
 function openWeatherSheet() {
   const w = getWeather(state.weather);
   const rw = realWeather;
-  const cityLabel = CITY.name + (CITY.region && CITY.region !== CITY.name ? ' · ' + CITY.region : '');
+  const cityLabel = cityDisplay();
 
   const metrics = rw ? `
     <div class="weather-grid">
