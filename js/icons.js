@@ -50,6 +50,8 @@ const ICONS = {
   compass: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15 9-2 5-4 1 2-5Z"/></svg>',
   route: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="5" r="2.2"/><path d="M6 19V8a2 2 0 0 1 2-2h8"/></svg>',
   spark: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.6 6.4L20 10l-6.4 1.6L12 18l-1.6-6.4L4 10l6.4-1.6Z"/><path d="M19 15l.8 3.2L23 19l-3.2.8L19 23l-.8-3.2L15 19l3.2-.8Z"/></svg>',
+  quill: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 3c-4.5 0-9 2.5-11 7-1.2 2.7-1.3 5.4-1 7.5"/><path d="M20 3c1 5-1.5 9.5-5.5 11.5C11.5 16 9 16 8 15.5"/><path d="M5 21c1.5-3.5 4-6 7-7.5"/></svg>',
+  shuffle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3.5 20.5 7 17 10.5"/><path d="M20.5 7H16a4 4 0 0 0-3.2 1.6L9 14a4 4 0 0 1-3.2 1.6H3.5"/><path d="M17 13.5 20.5 17 17 20.5"/><path d="M20.5 17H16a4 4 0 0 1-3.2-1.6l-.6-.8"/><path d="M3.5 7h2.3A4 4 0 0 1 9 8.6l.6.8"/></svg>',
 };
 
 /* 获取图标 HTML（可选颜色） */

@@ -65,17 +65,96 @@ function closeSheet() {
 let realWeather = null;      // 真实天气缓存（null 表示未获取或失败）
 let locating = false;        // 是否正在定位
 
+/* ---------- 城市文化轮播 ----------
+   策略：加权随机（定位城市权重更高）+ 不重复优先 + 定时自动切换 + 手动换一条 */
+const CULTURE_ROTATE_MS = 30000;   // 自动切换间隔（30 秒）
+let currentCulture = null;
+let cultureTimer = null;
+const shownCultureKeys = new Set();
+
+function cultureKey(c) { return c.city + '|' + c.text; }
+
+/* 按用户特征加权抽取一条文化内容 */
+function pickCulture() {
+  if (!CULTURE_DATA.length) return null;
+  // 权重：定位所在城市 ×4（更贴合用户），其余 ×1
+  const weighted = [];
+  CULTURE_DATA.forEach(c => {
+    const w = c.city === CITY.name ? 4 : 1;
+    for (let i = 0; i < w; i++) weighted.push(c);
+  });
+  // 优先挑没出现过的，保证轮换不重复
+  const fresh = weighted.filter(c => !shownCultureKeys.has(cultureKey(c)));
+  const pool = fresh.length ? fresh : weighted;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+/* 切换到下一条文化内容 */
+function rotateCulture(silent) {
+  const next = pickCulture();
+  if (!next) return;
+  currentCulture = next;
+  shownCultureKeys.add(cultureKey(next));
+  // 全部展示过一轮后重置，避免后续只能重复
+  if (shownCultureKeys.size >= CULTURE_DATA.length) shownCultureKeys.clear();
+  renderCultureCard(silent);
+}
+
+/* 只重绘文化卡内容，不重绘整个 hero（避免闪烁） */
+function renderCultureCard(silent) {
+  const el = document.getElementById('culture-card');
+  if (!el || !currentCulture) return;
+  const c = currentCulture;
+  const isLocal = c.city === CITY.name;
+  el.innerHTML = `
+    <div class="culture-head">
+      <span class="culture-label">${icon('quill')}城市文化</span>
+      <button class="culture-shuffle" id="culture-shuffle" aria-label="换一条">${icon('shuffle')}</button>
+    </div>
+    <div class="culture-text">「${c.text}」</div>
+    <div class="culture-meta">
+      <span class="culture-from">${c.from}</span>
+      <span class="culture-city ${isLocal ? 'local' : ''}">${icon('location')}${c.city}${isLocal ? ' · 你在这儿' : ''}</span>
+    </div>
+  `;
+  if (!silent) {
+    el.classList.remove('fade-in');
+    void el.offsetWidth;   // 触发重排以重启动画
+    el.classList.add('fade-in');
+  }
+  const btn = document.getElementById('culture-shuffle');
+  if (btn) btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    rotateCulture();
+  });
+}
+
+function startCultureTimer() {
+  clearInterval(cultureTimer);
+  cultureTimer = setInterval(() => {
+    if (document.hidden) return;          // 页面不可见时暂停
+    if (currentPage !== 'home') return;   // 不在首页时不切换
+    rotateCulture();
+  }, CULTURE_ROTATE_MS);
+}
+
 function renderHome() {
   const w = getWeather(state.weather);
   const tempStr = realWeather ? `${realWeather.temp}°` : '';
   const cityLabel = CITY.name + (CITY.region && CITY.region !== CITY.name ? '·' + CITY.region : '');
 
-  // 天气 + 预算 hero（天气为自动获取，不可手动切换）
+  if (!currentCulture) {
+    const first = pickCulture();
+    currentCulture = first;
+    if (first) shownCultureKeys.add(cultureKey(first));
+  }
+
+  // 天气 + 城市文化 hero（天气自动获取；预算已在引导流收集，此处不再重复）
   $('#home-hero').innerHTML = `
     <div class="hero-weather" id="weather-toggle">
       <div class="hero-icon">${icon(w.icon)}</div>
       <div class="hero-info">
-        <div class="hero-temp">${w.emoji} ${w.name}${tempStr ? ' · ' + tempStr : ''}${realWeather ? ' · ' + w.desc : ''}</div>
+        <div class="hero-temp">${w.emoji} ${w.name}${tempStr ? ' · ' + tempStr : ''}</div>
         <div class="hero-sub">${
           locating ? '正在定位你所在的城市…'
           : realWeather ? `${cityLabel} · 实时天气 · 点击看详情`
@@ -84,18 +163,18 @@ function renderHome() {
       </div>
       <button class="hero-arrow">${icon('arrowRight')}</button>
     </div>
-    <div class="hero-budget" id="budget-toggle">
-      <div class="hero-icon">${icon('wallet')}</div>
-      <div class="hero-info">
-        <div class="hero-temp">预算 <b>${fmtCost(state.filterPrefs.budget)}</b> 以内</div>
-        <div class="hero-sub">点击调整预算</div>
-      </div>
-      <button class="hero-arrow">${icon('arrowRight')}</button>
-    </div>
+    <div class="hero-culture" id="culture-card"></div>
   `;
 
   $('#weather-toggle').addEventListener('click', openWeatherSheet);
-  $('#budget-toggle').addEventListener('click', openBudgetSheet);
+  renderCultureCard(true);
+  startCultureTimer();
+
+  // 点击文化卡（非换一条按钮）查看该城市更多文化内容
+  $('#culture-card').addEventListener('click', (e) => {
+    if (e.target.closest('.culture-shuffle')) return;
+    openCultureSheet();
+  });
 
   // 天气按钮
   $('#btn-weather').innerHTML = icon(w.icon);
@@ -704,6 +783,40 @@ async function initLocationAndWeather() {
     saveState();
   }
   return { loc, rw };
+}
+
+/* 城市文化详情弹层：展示某城市的全部文化条目，可随机换城市 */
+function openCultureSheet(city) {
+  const target = city || (currentCulture ? currentCulture.city : CITY.name);
+  let items = cultureByCity(target);
+  // 该城市暂无收录则退回展示随机三座城市的内容
+  if (!items.length) {
+    const cities = [...new Set(CULTURE_DATA.map(x => x.city))];
+    const pick = cities.sort(() => Math.random() - 0.5).slice(0, 3);
+    items = pick.flatMap(c => cultureByCity(c));
+  }
+
+  openSheet(`
+    <h3>城市文化 · ${target}</h3>
+    <p class="culture-sheet-sub">诗词名句与人文知识，带你认识这座城</p>
+    <div class="culture-sheet-list">
+      ${items.map(i => `
+        <div class="culture-item">
+          <div class="ci-text">「${i.text}」</div>
+          <div class="ci-from">—— ${i.from}</div>
+          <div class="ci-spot">${icon('location')}${i.spot}${i.region && i.region !== i.city ? ' · ' + i.region : ''}</div>
+          <div class="ci-note">${i.note}</div>
+        </div>
+      `).join('')}
+    </div>
+    <button class="btn btn-ghost" style="width:100%" id="culture-other">${icon('shuffle')} 换个城市看看</button>
+  `);
+
+  $('#culture-other').addEventListener('click', () => {
+    const cities = [...new Set(CULTURE_DATA.map(x => x.city))].filter(x => x !== target);
+    const next = cities[Math.floor(Math.random() * cities.length)];
+    openCultureSheet(next);
+  });
 }
 
 /* 预算选择弹层（档位与引导流保持一致：100 元起，去掉几十元档） */

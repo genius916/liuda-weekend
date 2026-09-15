@@ -1423,3 +1423,129 @@ html, body { overflow-x: hidden; }
   .wg-item, .wf-item { background: #1b201f; }
   .weather-note { background: #0d2b22; color: var(--ink-400); }
 }
+
+/* ============================================================
+   城市文化板块（hero 右侧卡片 + 详情弹层）
+   ============================================================ */
+.hero-culture {
+  background: linear-gradient(145deg, #fffefb 0%, #fdf8ee 100%);
+  border: 1px solid #f0e8d6;
+  border-radius: var(--r-lg);
+  padding: 13px 14px;
+  box-shadow: var(--shadow-1);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+  transition: transform .22s var(--ease-spring), box-shadow .22s;
+}
+.hero-culture::after {
+  content: '';
+  position: absolute;
+  right: -18px; bottom: -18px;
+  width: 70px; height: 70px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(16,185,129,.10), transparent 70%);
+  pointer-events: none;
+}
+.hero-culture:active { transform: scale(.97); }
+.hero-culture.fade-in { animation: cultureIn .45s var(--ease-out); }
+@keyframes cultureIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.culture-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 6px;
+}
+.culture-label {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11.5px; font-weight: 700; color: #a3803c;
+  letter-spacing: .02em;
+}
+.culture-label svg { width: 13px; height: 13px; }
+.culture-shuffle {
+  color: #c0a878;
+  padding: 3px; border-radius: 50%;
+  transition: transform .3s var(--ease-spring), color .2s;
+  flex-shrink: 0;
+}
+.culture-shuffle svg { width: 14px; height: 14px; }
+.culture-shuffle:hover { color: #a3803c; }
+.culture-shuffle:active { transform: rotate(180deg) scale(.85); }
+
+.culture-text {
+  font-size: 13.5px; font-weight: 700; line-height: 1.5;
+  color: #4a3f2a;
+  font-family: var(--font-display);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.culture-meta {
+  display: flex; flex-direction: column; gap: 3px;
+  margin-top: auto;
+}
+.culture-from {
+  font-size: 10.5px; color: #a89878;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.culture-city {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 10.5px; color: #8b7d5f; font-weight: 600;
+}
+.culture-city svg { width: 11px; height: 11px; }
+.culture-city.local { color: var(--mint-600); }
+
+/* ---------- 文化详情弹层 ---------- */
+.culture-sheet-sub {
+  font-size: 12.5px; color: var(--ink-400);
+  margin: 4px 0 16px; line-height: 1.6;
+}
+.culture-sheet-list {
+  display: flex; flex-direction: column; gap: 12px; margin-bottom: 18px;
+}
+.culture-item {
+  padding: 14px 16px;
+  background: linear-gradient(145deg, #fffefb, #fdf8ee);
+  border: 1px solid #f0e8d6;
+  border-radius: var(--r-md);
+}
+.ci-text {
+  font-size: 15px; font-weight: 700; line-height: 1.6;
+  color: #4a3f2a; font-family: var(--font-display);
+}
+.ci-from { font-size: 12px; color: #a89878; margin-top: 6px; }
+.ci-spot {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; color: var(--mint-600); font-weight: 600; margin-top: 6px;
+}
+.ci-spot svg { width: 13px; height: 13px; }
+.ci-note {
+  font-size: 12.5px; color: var(--ink-500); line-height: 1.65;
+  margin-top: 8px; padding-top: 8px; border-top: 1px dashed #f0e8d6;
+}
+
+/* 深色模式 */
+@media (prefers-color-scheme: dark) {
+  .hero-culture {
+    background: linear-gradient(145deg, #262218, #201d15);
+    border-color: #3a3323;
+  }
+  .culture-text { color: #ece1c8; }
+  .culture-from { color: #9c8f72; }
+  .culture-city { color: #a89a78; }
+  .culture-city.local { color: var(--mint-400); }
+  .culture-label { color: #c9ab6a; }
+  .culture-item {
+    background: linear-gradient(145deg, #262218, #201d15);
+    border-color: #3a3323;
+  }
+  .ci-text { color: #ece1c8; }
+  .ci-from { color: #9c8f72; }
+  .ci-note { border-top-color: #3a3323; }
+}
