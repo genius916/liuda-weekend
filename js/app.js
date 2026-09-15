@@ -1109,6 +1109,12 @@ function init() {
   // 顶部导航滚动阴影
   initScrollShadow();
 
+  // demo 模式（?demo=1）：跳过引导直接看推荐态，方便演示与评审
+  if (new URLSearchParams(location.search).has('demo')) {
+    state.onboarded = true;
+    if (!state.user.interests.length) state.user.interests = ['exhibition', 'market', 'hike'];
+  }
+
   // 初次渲染
   renderHome();
 
