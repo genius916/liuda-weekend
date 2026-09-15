@@ -62,16 +62,19 @@ function closeSheet() {
 }
 
 /* ---------- 首页 ---------- */
+let realWeather = null; // 真实天气缓存（null 表示未获取或失败）
+
 function renderHome() {
   const w = getWeather(state.weather);
+  const tempStr = realWeather ? `${realWeather.temp}°` : '';
 
   // 天气 + 预算 hero
   $('#home-hero').innerHTML = `
     <div class="hero-weather" id="weather-toggle">
       <div class="hero-icon">${icon(w.icon)}</div>
       <div>
-        <div class="hero-temp">${w.emoji} ${w.name} · ${w.desc}</div>
-        <div class="hero-sub">杭州 · 今天适合这样玩</div>
+        <div class="hero-temp">${w.emoji} ${w.name}${tempStr ? ' · ' + tempStr : ''} · ${w.desc}</div>
+        <div class="hero-sub">${CITY.name} · ${realWeather ? '实时天气' : '今天适合这样玩'}</div>
       </div>
       <button class="hero-arrow">${icon('arrowRight')}</button>
     </div>
@@ -785,6 +788,20 @@ function init() {
 
   // 初次渲染
   renderHome();
+
+  // 异步获取真实天气（Open-Meteo，免费无需 key）
+  fetchRealWeather().then(rw => {
+    if (rw && rw.type !== state.weather) {
+      realWeather = rw;
+      state.weather = rw.type;
+      state.filterPrefs.weather = rw.type;
+      saveState();
+      if (currentPage === 'home') renderHome();
+    } else if (rw) {
+      realWeather = rw;
+      if (currentPage === 'home') renderHome();
+    }
+  });
 }
 
 /* ---------- 返回顶部 ---------- */

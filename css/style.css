@@ -997,3 +997,64 @@ img { display: block; max-width: 100%; }
 .g-cover[data-cover="2"] { background: linear-gradient(135deg, #ffc8dd, #f472b6); }
 .g-cover[data-cover="3"] { background: linear-gradient(135deg, #ffe3b3, #fbbf24); }
 .g-cover[data-cover="4"] { background: linear-gradient(135deg, #bfe3ff, #60a5fa); }
+
+/* ============================================================
+   深色模式（prefers-color-scheme 自动适配）
+   ============================================================ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink-900: #f2f5f4;
+    --ink-700: #d6dbd9;
+    --ink-500: #a6aeab;
+    --ink-400: #7f8885;
+    --ink-300: #5c6461;
+    --ink-200: #3a4140;
+    --ink-100: #2a302f;
+    --ink-50:  #1b201f;
+
+    --mint-50:  #0d2b22;
+    --mint-100: #123b2f;
+    --shadow-1: 0 1px 2px rgba(0,0,0,.4);
+    --shadow-2: 0 2px 8px rgba(0,0,0,.5);
+    --shadow-3: 0 8px 24px rgba(0,0,0,.6);
+  }
+
+  body { background: #141817; }
+
+  /* 卡片背景转深色 */
+  .card, .hero-weather, .hero-budget, .cs-item,
+  .me-stats, .me-list, .search-bar, .budget-opt,
+  .weather-opt, .sheet, .photo-cell, .back-top {
+    background: #222726;
+    border-color: var(--ink-100);
+  }
+
+  .sheet { background: #1b201f; }
+
+  .tabbar { background: rgba(27,32,31,.85); border-color: var(--ink-100); }
+
+  .topbar {
+    background: linear-gradient(#141817, rgba(20,24,23,.92));
+  }
+
+  .act-body h3, .team-title h3, .g-body h3,
+  .ck-head h3, .detail h2, .me-info h3 { color: var(--ink-900); }
+
+  .field input, .field textarea, .field select {
+    background: #1b201f;
+    border-color: var(--ink-200);
+    color: var(--ink-900);
+  }
+
+  .mini-tag { background: var(--ink-100); color: var(--ink-500); }
+
+  .btn-ghost { background: var(--ink-100); color: var(--ink-700); }
+  .btn-outline { background: transparent; color: var(--mint-400); border-color: var(--mint-600); }
+
+  /* 分类封面在深色下降低亮度 */
+  .act-img::after, .g-cover::after, .ck-img::after, .detail-img::after {
+    background-image:
+      radial-gradient(circle at 80% 20%, rgba(255,255,255,.12), transparent 45%),
+      radial-gradient(circle at 20% 80%, rgba(0,0,0,.2), transparent 40%);
+  }
+}

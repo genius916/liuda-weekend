@@ -22,6 +22,40 @@ const WEATHERS = {
   rain:   { name: '小雨',  emoji: '🌧️', desc: '带伞出门', icon: 'rain' },
 };
 
+/* WMO 天气码 → 天气类型（Open-Meteo 免费接口，无需 key） */
+const WMO_TO_WEATHER = {
+  0: 'sunny', 1: 'sunny', 2: 'cloudy', 3: 'cloudy',          // 晴 / 多云
+  45: 'cloudy', 48: 'cloudy',                                 // 雾
+  51: 'rain', 53: 'rain', 55: 'rain',                         // 毛毛雨
+  61: 'rain', 63: 'rain', 65: 'rain',                         // 雨
+  66: 'rain', 67: 'rain', 71: 'rain', 73: 'rain', 75: 'rain', // 冻雨/雪（归为雨天）
+  77: 'rain', 80: 'rain', 81: 'rain', 82: 'rain',             // 阵雨
+  85: 'rain', 86: 'rain', 95: 'rain', 96: 'rain', 99: 'rain', // 雪/雷暴
+};
+
+/* 城市坐标（杭州） */
+const CITY = { name: '杭州', lat: 30.2741, lng: 120.1551 };
+
+/* 获取真实天气（Open-Meteo，失败返回 null 走降级） */
+async function fetchRealWeather() {
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${CITY.lat}&longitude=${CITY.lng}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Asia%2FShanghai&forecast_days=1`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const code = data.current?.weather_code ?? data.daily?.weather_code?.[0];
+    const temp = data.current?.temperature_2m ?? data.daily?.temperature_2m_max?.[0];
+    if (code === undefined) return null;
+    return {
+      type: WMO_TO_WEATHER[code] || 'cloudy',
+      temp: Math.round(temp),
+      code,
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
 /* ---------- 演示活动 ---------- */
 const DEMO_ACTIVITIES = [
   {
