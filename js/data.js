@@ -38,25 +38,68 @@ const DEFAULT_CITY = { name: '杭州', lat: 30.2741, lng: 120.1551 };
 let CITY = { ...DEFAULT_CITY };
 
 /**
- * IP 定位获取用户所在城市（ipinfo.io，免费、无需 key、支持 CORS）
- * 失败返回 null，由调用方走默认城市兜底
+ * IP 定位获取用户所在城市 + 经纬度
+ * 主源：api.vore.top（返回中文城市名，免费、支持 CORS）
+ *       → Open-Meteo Geocoding 反查经纬度
+ * 备用：ipinfo.io（直接返回经纬度）
+ * 全部失败返回 null，由调用方兜底默认城市
  */
-async function fetchLocation() {
+const EN2CN_CITY = {
+  Beijing: '北京', Shanghai: '上海', Guangzhou: '广州', Shenzhen: '深圳',
+  Hangzhou: '杭州', Nanjing: '南京', Suzhou: '苏州', Chengdu: '成都',
+  Chongqing: '重庆', Wuhan: '武汉', Xian: "西安", Tianjin: '天津',
+  Changsha: '长沙', Qingdao: '青岛', Xiamen: '厦门', Ningbo: '宁波',
+  Zhengzhou: '郑州', Jinan: '济南', Hefei: '合肥', Fuzhou: '福州',
+  Kunming: '昆明', Dalian: '大连', Shenyang: '沈阳', Harbin: '哈尔滨',
+  Wenzhou: '温州', Jiaxing: '嘉兴', Shaoxing: '绍兴', Jinhua: '金华',
+};
+
+async function geocodeCity(name) {
   try {
-    const res = await fetch('https://ipinfo.io/json');
+    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=zh&format=json`;
+    const res = await fetch(url);
     if (!res.ok) return null;
     const d = await res.json();
-    if (!d || !d.loc) return null;
-    const [lat, lng] = String(d.loc).split(',').map(Number);
-    if (!isFinite(lat) || !isFinite(lng)) return null;
-    return {
-      name: d.city || d.region || DEFAULT_CITY.name,
-      region: d.region || '',
-      lat, lng,
-    };
+    const hit = d?.results?.[0];
+    if (!hit) return null;
+    return { lat: hit.latitude, lng: hit.longitude };
   } catch (e) {
     return null;
   }
+}
+
+async function fetchLocation() {
+  // 主源：vore.top（中文城市名）
+  try {
+    const res = await fetch('https://api.vore.top/api/IPdata');
+    if (res.ok) {
+      const d = await res.json();
+      const rawCity = d?.ipdata?.info2 || d?.adcode?.c || '';
+      const city = String(rawCity).replace(/[市省]$/, '');
+      const region = String(d?.ipdata?.info1 || '').replace(/[市省]$/, '');
+      if (city) {
+        const geo = await geocodeCity(city);
+        if (geo) return { name: city, region, lat: geo.lat, lng: geo.lng };
+      }
+    }
+  } catch (e) { /* 继续走备用源 */ }
+
+  // 备用源：ipinfo.io（直接给经纬度）
+  try {
+    const res = await fetch('https://ipinfo.io/json');
+    if (res.ok) {
+      const d = await res.json();
+      if (d && d.loc) {
+        const [lat, lng] = String(d.loc).split(',').map(Number);
+        if (isFinite(lat) && isFinite(lng)) {
+          const cn = EN2CN_CITY[d.city] || d.city || DEFAULT_CITY.name;
+          return { name: cn, region: '', lat, lng };
+        }
+      }
+    }
+  } catch (e) { /* 走兜底 */ }
+
+  return null;
 }
 
 /* ---------- 交通方式 ---------- */
